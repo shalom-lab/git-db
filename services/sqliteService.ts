@@ -148,33 +148,38 @@ export const initSQLite = async () => {
     const configResponse = await promiser('config-get', {});
     console.log("SQLite3 loaded version:", configResponse.result.version.libVersion);
 
-    // 步骤5: 等待 OPFS VFS 初始化完成（如果还没有完成）
-    // OPFS VFS 的初始化是异步的，需要等待它完成
-    console.log("Step 5: Waiting for OPFS VFS to be ready...");
-    // 给一点时间让 OPFS VFS 初始化完成
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // 步骤6: 打开 OPFS 数据库（必须使用 OPFS）
-    console.log("Step 6: Opening OPFS database...");
+    // 步骤5: 打开 OPFS 数据库（必须使用 OPFS）
+    console.log("Step 5: Opening OPFS database...");
     const openResponse = await promiser('open', {
       filename: 'file:gitdb_data.db?vfs=opfs',
     });
     
-    // 输出详细的错误信息以便调试
-    console.log("Open database response:", JSON.stringify(openResponse.result, null, 2));
+    // 输出详细的响应信息以便调试
+    console.log("Open database response:", JSON.stringify(openResponse, null, 2));
     
-    if (openResponse.result.code !== 0) {
-      const errorMsg = openResponse.result.message || 'Unknown error';
-      const errorCode = openResponse.result.code;
+    // 🛑 修复：检查是否出错，而不是检查 code !== 0
+    // 在 sqlite3Worker1Promiser API 中：
+    // - 成功时：result 对象里有 dbId，没有 code 属性（undefined）
+    // - 失败时：type 属性会变成 'error'，或者 result 里会有 message
+    if (openResponse.type === 'error') {
+      const errorMsg = openResponse.result?.message || 'Unknown error';
       console.error("OPFS database open failed:", {
-        code: errorCode,
+        type: openResponse.type,
         message: errorMsg,
-        fullResponse: openResponse.result
+        fullResponse: openResponse
       });
-      throw new Error(`Failed to open OPFS database: ${errorMsg} (code: ${errorCode})`);
+      throw new Error(`Failed to open OPFS database: ${errorMsg}`);
     }
     
+    // 双重检查 dbId 是否存在
+    if (!openResponse.result?.dbId) {
+      console.error("OPFS database open failed: No dbId returned", openResponse);
+      throw new Error("Failed to open OPFS database: No dbId returned");
+    }
+    
+    // 成功！
     dbId = openResponse.result.dbId;
+    console.log("✅ Database opened successfully. ID:", dbId);
     console.log("Storage: OPFS persistence active, database opened");
     
     return { dbId, promiser };
