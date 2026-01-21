@@ -4,17 +4,54 @@ import initSqlite3 from '@sqlite.org/sqlite-wasm';
 let sqlite3: any = null;
 let db: any = null;
 
+/**
+ * 等待 crossOriginIsolated 环境准备就绪
+ * Service Worker 可能需要一些时间才能激活并设置正确的 COOP/COEP 头
+ */
+const waitForCrossOriginIsolated = async (maxWait = 3000): Promise<boolean> => {
+  // 如果已经准备好了，直接返回
+  if (typeof window !== 'undefined' && window.crossOriginIsolated) {
+    return true;
+  }
+
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.crossOriginIsolated) {
+        clearInterval(checkInterval);
+        resolve(true);
+      } else if (Date.now() - startTime > maxWait) {
+        clearInterval(checkInterval);
+        console.warn(`crossOriginIsolated not available after ${maxWait}ms`);
+        resolve(false);
+      }
+    }, 100);
+  });
+};
+
 export const isOpfsSupported = () => {
-  return typeof SharedArrayBuffer !== 'undefined' && 'storage' in navigator && 'getDirectory' in navigator.storage;
+  return typeof window !== 'undefined' &&
+         window.crossOriginIsolated === true &&
+         typeof SharedArrayBuffer !== 'undefined' && 
+         'storage' in navigator && 
+         'getDirectory' in navigator.storage;
 };
 
 export const initSQLite = async () => {
   if (db) return db;
 
   try {
+    // 等待 crossOriginIsolated 环境准备就绪
+    // Service Worker 可能需要时间激活
+    const isCrossOriginIsolated = await waitForCrossOriginIsolated();
+    
     // Check for SharedArrayBuffer which is required for OPFS workers
     if (typeof SharedArrayBuffer === 'undefined') {
       console.warn("SharedArrayBuffer not available. OPFS persistence might fail. Ensure COOP/COEP headers are set.");
+    }
+
+    if (typeof window !== 'undefined' && !window.crossOriginIsolated) {
+      console.warn("crossOriginIsolated is false. OPFS may not work. Ensure Service Worker is active and COOP/COEP headers are set.");
     }
 
     // Fixed: initSqlite3 expects 0 arguments.
@@ -22,11 +59,32 @@ export const initSQLite = async () => {
     
     console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
-    if (isOpfsSupported() && 'oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1) {
-      db = new sqlite3.oo1.OpfsDb('/gitdb_data.db');
-      console.log("Storage: OPFS persistence active");
+    // 检查 OPFS 支持情况
+    const opfsSupported = isOpfsSupported();
+    
+    if (opfsSupported && 'oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1) {
+      try {
+        db = new sqlite3.oo1.OpfsDb('/gitdb_data.db');
+        console.log("Storage: OPFS persistence active");
+      } catch (opfsError: any) {
+        console.warn("Failed to create OpfsDb, falling back to in-memory:", opfsError.message);
+        db = new sqlite3.oo1.DB();
+      }
     } else {
-      console.warn("Storage: OPFS not available, using in-memory fallback");
+      const reasons: string[] = [];
+      if (typeof window === 'undefined' || !window.crossOriginIsolated) {
+        reasons.push("crossOriginIsolated is false");
+      }
+      if (typeof SharedArrayBuffer === 'undefined') {
+        reasons.push("SharedArrayBuffer not available");
+      }
+      if (!('storage' in navigator && 'getDirectory' in navigator.storage)) {
+        reasons.push("OPFS API not available");
+      }
+      if (!('oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1)) {
+        reasons.push("OpfsDb not available in SQLite WASM");
+      }
+      console.warn(`Storage: OPFS not available (${reasons.join(', ')}), using in-memory fallback`);
       db = new sqlite3.oo1.DB();
     }
     

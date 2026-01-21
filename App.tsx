@@ -7,6 +7,7 @@ import DynamicForm from './components/DynamicForm';
 import Sidebar from './components/Sidebar';
 import SettingsView from './components/SettingsView';
 import SqlTerminal from './components/SqlTerminal';
+import { ToastContainer, Toast, ToastType } from './components/Toast';
 import { initSQLite, executeQuery, getTables, getTableInfo, exportDatabase, importDatabase, isOpfsSupported } from './services/sqliteService';
 import { GitHubService } from './services/githubService';
 
@@ -41,9 +42,20 @@ const App: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingRow, setEditingRow] = useState<any | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   
   const githubServiceRef = useRef<GitHubService | null>(null);
   const t = I18N[lang];
+
+  const showToast = (message: string, type: ToastType = 'info', duration?: number) => {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const newToast: Toast = { id, message, type, duration };
+    setToasts((prev) => [...prev, newToast]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
 
   // Prevent accidental exit if unsaved changes exist
   useEffect(() => {
@@ -180,7 +192,10 @@ const App: React.FC = () => {
       }
       setState(prev => ({ ...prev, hasUnsavedChanges: true }));
       loadTable(state.currentTable, currentPage);
-    } catch (err: any) { alert("Database error: " + err.message); }
+      showToast(lang === Language.EN ? "Record saved successfully" : "记录保存成功", 'success');
+    } catch (err: any) { 
+      showToast((lang === Language.EN ? "Database error: " : "数据库错误: ") + err.message, 'error');
+    }
   };
 
   const handleDeleteRow = (row: any) => {
@@ -191,7 +206,10 @@ const App: React.FC = () => {
       executeQuery(`DELETE FROM "${state.currentTable}" WHERE "${pkCol.name}" = ?`, [row[pkCol.name]]);
       setState(prev => ({ ...prev, hasUnsavedChanges: true }));
       loadTable(state.currentTable, currentPage);
-    } catch (err: any) { alert("Delete failed: " + err.message); }
+      showToast(lang === Language.EN ? "Record deleted successfully" : "记录删除成功", 'success');
+    } catch (err: any) { 
+      showToast((lang === Language.EN ? "Delete failed: " : "删除失败: ") + err.message, 'error');
+    }
   };
 
   const pushToGitHub = async () => {
@@ -204,10 +222,10 @@ const App: React.FC = () => {
       const response = await githubServiceRef.current.uploadFile(state.config.path, data, sha);
       localStorage.setItem('gitdb_sha', response.content.sha);
       setState(prev => ({ ...prev, syncStatus: { state: 'ready' }, hasUnsavedChanges: false }));
-      alert("Successfully pushed to GitHub!");
+      showToast(lang === Language.EN ? "Successfully pushed to GitHub!" : "成功推送到 GitHub！", 'success');
     } catch (err: any) {
       setState(prev => ({ ...prev, syncStatus: { state: 'error', message: err.message } }));
-      alert("Push failed: " + err.message);
+      showToast((lang === Language.EN ? "Push failed: " : "推送失败: ") + err.message, 'error');
     }
   };
 
@@ -283,7 +301,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 overflow-auto p-4 md:p-8 bg-gray-50/50 dark:bg-dark/40 custom-scrollbar">
           {state.currentView === 'settings' ? (
-            <SettingsView config={state.config} lang={lang} onUpdate={handleAuthConfig} onReset={resetConfig} />
+            <SettingsView config={state.config} lang={lang} onUpdate={handleAuthConfig} />
           ) : state.currentView === 'sql' ? (
             <SqlTerminal lang={lang} onMutation={markDirty} />
           ) : isEditing && currentTableInfo ? (
@@ -384,6 +402,7 @@ const App: React.FC = () => {
       </main>
 
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; } .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }`}</style>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 };

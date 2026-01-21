@@ -7,10 +7,9 @@ interface SettingsViewProps {
   config: GithubConfig | null;
   lang: Language;
   onUpdate: (config: GithubConfig) => void;
-  onReset: () => void;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate, onReset }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) => {
   const [localConfig, setLocalConfig] = useState<GithubConfig>(config || {
     token: '',
     repo: '',
@@ -143,22 +142,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate, onR
           </div>
         </div>
       </div>
-
-      {config && (
-        <div className="bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 p-6 space-y-4">
-          <h3 className="text-red-700 dark:text-red-400 font-bold flex items-center space-x-2">
-            {ICONS.Trash}
-            <span>{t.settings.danger_zone}</span>
-          </h3>
-          <p className="text-sm text-red-600 dark:text-red-400/80">{t.settings.reset_desc}</p>
-          <button
-            onClick={onReset}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all"
-          >
-            {t.settings.reset_btn}
-          </button>
-        </div>
-      )}
     </div>
   );
 };
