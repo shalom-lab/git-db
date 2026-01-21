@@ -155,8 +155,16 @@ const App: React.FC = () => {
     try {
       const tableList = getTables();
       setTables(tableList);
-      if (tableList.length > 0 && !state.currentTable) loadTable(tableList[0].name);
-    } catch (e) { console.error("Table refresh failed", e); }
+      // 如果有表格，确保自动加载第一个表格
+      if (tableList.length > 0) {
+        // 如果当前没有选中表格，或者当前选中的表格不在列表中，加载第一个表格
+        if (!state.currentTable || !tableList.find(t => t.name === state.currentTable)) {
+          loadTable(tableList[0].name, 0);
+        }
+      }
+    } catch (e) { 
+      console.error("Table refresh failed", e); 
+    }
   };
 
   const loadTable = (tableName: string, page: number = 0) => {
@@ -216,7 +224,7 @@ const App: React.FC = () => {
     if (!state.config || !githubServiceRef.current) { setView('settings'); return; }
     setState(prev => ({ ...prev, syncStatus: { state: 'uploading', message: t.status.saving } }));
     try {
-      const data = exportDatabase();
+      const data = await exportDatabase();
       const currentMeta = await githubServiceRef.current.getFileMetadata(state.config.path);
       const sha = currentMeta?.sha;
       const response = await githubServiceRef.current.uploadFile(state.config.path, data, sha);
