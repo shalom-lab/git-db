@@ -151,15 +151,15 @@ const App: React.FC = () => {
 
   useEffect(() => { if (!state.dbReady && !initError) syncDatabase(); }, [state.dbReady, syncDatabase, initError]);
 
-  const refreshTables = () => {
+  const refreshTables = async () => {
     try {
-      const tableList = getTables();
+      const tableList = await getTables();
       setTables(tableList);
       // 如果有表格，确保自动加载第一个表格
       if (tableList.length > 0) {
         // 如果当前没有选中表格，或者当前选中的表格不在列表中，加载第一个表格
-        if (!state.currentTable || !tableList.find(t => t.name === state.currentTable)) {
-          loadTable(tableList[0].name, 0);
+        if (!state.currentTable || !tableList.find((t: any) => t.name === state.currentTable)) {
+          await loadTable(tableList[0].name, 0);
         }
       }
     } catch (e) { 
@@ -167,12 +167,12 @@ const App: React.FC = () => {
     }
   };
 
-  const loadTable = (tableName: string, page: number = 0) => {
+  const loadTable = async (tableName: string, page: number = 0) => {
     try {
-      const colInfo = getTableInfo(tableName);
+      const colInfo = await getTableInfo(tableName);
       const offset = page * PAGE_SIZE;
-      const tableData = executeQuery(`SELECT * FROM "${tableName}" LIMIT ${PAGE_SIZE} OFFSET ${offset}`);
-      const countRes = executeQuery(`SELECT COUNT(*) as count FROM "${tableName}"`);
+      const tableData = await executeQuery(`SELECT * FROM "${tableName}" LIMIT ${PAGE_SIZE} OFFSET ${offset}`);
+      const countRes = await executeQuery(`SELECT COUNT(*) as count FROM "${tableName}"`);
       
       setTotalRows(countRes[0]?.count || 0);
       setCurrentPage(page);
@@ -183,7 +183,7 @@ const App: React.FC = () => {
     } catch (e) { console.error("Table load failed", e); }
   };
 
-  const handleSaveRow = (data: any) => {
+  const handleSaveRow = async (data: any) => {
     if (!state.currentTable || !currentTableInfo) return;
     const columns = currentTableInfo.columns.map(c => c.name);
     const placeholders = columns.map(() => '?').join(', ');
@@ -193,27 +193,28 @@ const App: React.FC = () => {
         const pkCol = currentTableInfo.columns.find(c => c.pk === 1);
         if (pkCol) {
           const updateStr = columns.map(c => `"${c}" = ?`).join(', ');
-          executeQuery(`UPDATE "${state.currentTable}" SET ${updateStr} WHERE "${pkCol.name}" = ?`, [...values, editingRow[pkCol.name]]);
+          await executeQuery(`UPDATE "${state.currentTable}" SET ${updateStr} WHERE "${pkCol.name}" = ?`, [...values, editingRow[pkCol.name]]);
         }
       } else {
-        executeQuery(`INSERT INTO "${state.currentTable}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${placeholders})`, values);
+        await executeQuery(`INSERT INTO "${state.currentTable}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${placeholders})`, values);
       }
       setState(prev => ({ ...prev, hasUnsavedChanges: true }));
-      loadTable(state.currentTable, currentPage);
+      setIsEditing(false);
+      await loadTable(state.currentTable, currentPage);
       showToast(lang === Language.EN ? "Record saved successfully" : "记录保存成功", 'success');
     } catch (err: any) { 
       showToast((lang === Language.EN ? "Database error: " : "数据库错误: ") + err.message, 'error');
     }
   };
 
-  const handleDeleteRow = (row: any) => {
+  const handleDeleteRow = async (row: any) => {
     if (!state.currentTable || !currentTableInfo) return;
     const pkCol = currentTableInfo.columns.find(c => c.pk === 1);
     if (!pkCol || !confirm("Delete this record?")) return;
     try {
-      executeQuery(`DELETE FROM "${state.currentTable}" WHERE "${pkCol.name}" = ?`, [row[pkCol.name]]);
+      await executeQuery(`DELETE FROM "${state.currentTable}" WHERE "${pkCol.name}" = ?`, [row[pkCol.name]]);
       setState(prev => ({ ...prev, hasUnsavedChanges: true }));
-      loadTable(state.currentTable, currentPage);
+      await loadTable(state.currentTable, currentPage);
       showToast(lang === Language.EN ? "Record deleted successfully" : "记录删除成功", 'success');
     } catch (err: any) { 
       showToast((lang === Language.EN ? "Delete failed: " : "删除失败: ") + err.message, 'error');

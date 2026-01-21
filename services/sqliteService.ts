@@ -1,7 +1,7 @@
 
-// 使用动态导入，确保在环境准备好后再加载 SQLite WASM
-let sqlite3: any = null;
-let db: any = null;
+// 使用 Wrapped Worker 方式，支持 OPFS（这是唯一支持 OPFS 的方式）
+let promiser: any = null;
+let dbId: number | null = null;
 let sqlite3Module: any = null;
 
 /**
@@ -71,7 +71,7 @@ export const isOpfsSupported = () => {
 };
 
 export const initSQLite = async () => {
-  if (db) return db;
+  if (dbId !== null) return { dbId, promiser };
 
   try {
     // 步骤1: 等待 Service Worker 完全准备好
@@ -92,130 +92,108 @@ export const initSQLite = async () => {
     }
 
     console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
-    // 步骤3: 动态导入 SQLite WASM（确保在环境准备好后再加载）
-    // 直接使用 CDN URL 确保使用正确的版本（3.51.2-build2），这个版本有完整的 OPFS 支持
-    // 使用 importmap 中指定的版本，确保 OPFS OpfsDb 类可用
+    // 步骤3: 动态导入 SQLite WASM（使用 Wrapped Worker 方式，支持 OPFS）
     if (!sqlite3Module) {
-      // 在浏览器中，importmap 会处理 '@sqlite.org/sqlite-wasm' 的解析
-      // 但为了确保使用正确的版本，我们直接使用 importmap 中定义的路径
-      // 浏览器会自动使用 importmap 中的映射
       sqlite3Module = await import('@sqlite.org/sqlite-wasm');
       console.log("SQLite WASM module loaded from importmap");
     }
     
-    // 步骤4: 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
-    console.log("Step 4: Initializing SQLite WASM...");
-    // SQLite WASM 从 CDN 加载时，需要正确配置 WASM 文件的路径
-    // 使用默认初始化，让 SQLite WASM 自己处理 WASM 文件路径（从 CDN 加载）
-    sqlite3 = await sqlite3Module.default({
-      // 如果 SQLite WASM 需要额外的配置，可以在这里指定
-      // 默认情况下，它会从 CDN 正确加载 WASM 文件
+    // 步骤4: 初始化 SQLite WASM Wrapped Worker（这是唯一支持 OPFS 的方式）
+    console.log("Step 4: Initializing SQLite WASM with Wrapped Worker (OPFS support)...");
+    
+    promiser = await new Promise((resolve, reject) => {
+      try {
+        const _promiser = sqlite3Module.sqlite3Worker1Promiser({
+          onready: () => {
+            console.log("SQLite WASM Worker ready");
+            resolve(_promiser);
+          },
+          onerror: (err: any) => {
+            console.error("SQLite WASM Worker error:", err);
+            reject(err);
+          }
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
-    console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
-    // 再次确认环境状态（确保在 SQLite WASM 初始化后仍然有效）
-    const opfsSupported = isOpfsSupported();
-    console.log("Environment check after SQLite init:", {
-      crossOriginIsolated: typeof window !== 'undefined' ? window.crossOriginIsolated : 'N/A',
-      hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-      hasStorage: 'storage' in navigator,
-      hasGetDirectory: 'storage' in navigator && 'getDirectory' in navigator.storage,
-      opfsSupported
+    // 获取版本信息
+    const configResponse = await promiser('config-get', {});
+    console.log("SQLite3 loaded version:", configResponse.result.version.libVersion);
+
+    // 步骤5: 打开 OPFS 数据库（必须使用 OPFS）
+    console.log("Step 5: Opening OPFS database...");
+    const openResponse = await promiser('open', {
+      filename: 'file:gitdb_data.db?vfs=opfs',
     });
     
-    if (!opfsSupported) {
-      const reasons: string[] = [];
-      if (typeof window === 'undefined' || !window.crossOriginIsolated) {
-        reasons.push("crossOriginIsolated is false");
-      }
-      if (typeof SharedArrayBuffer === 'undefined') {
-        reasons.push("SharedArrayBuffer not available");
-      }
-      if (!('storage' in navigator && 'getDirectory' in navigator.storage)) {
-        reasons.push("OPFS API not available");
-      }
-      throw new Error(`OPFS is required but not available: ${reasons.join(', ')}. Please refresh the page to allow Service Worker to activate.`);
+    if (openResponse.result.code !== 0) {
+      throw new Error(`Failed to open OPFS database: ${openResponse.result.message || 'Unknown error'}`);
     }
-
-    // 检查 OpfsDb 是否可用
-    // 根据 SQLite WASM 文档，OpfsDb 应该可用，即使 OPFS VFS 在主线程安装失败
-    // 因为 OpfsDb 会自动在 Worker 中处理
-    console.log("Step 5: Checking for OpfsDb availability...");
-    console.log("SQLite3 object structure:", {
-      hasOo1: 'oo1' in sqlite3,
-      hasCapi: 'capi' in sqlite3,
-      oo1Keys: 'oo1' in sqlite3 ? Object.keys(sqlite3.oo1) : [],
-      hasOpfsDb: 'oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1,
-      hasOpfsVfs: 'capi' in sqlite3 && sqlite3.capi.sqlite3_vfs_find ? sqlite3.capi.sqlite3_vfs_find('opfs') !== null : 'N/A'
-    });
-
-    if (!('oo1' in sqlite3)) {
-      throw new Error("SQLite WASM oo1 API not available. This is unexpected.");
-    }
-
-    if (!('OpfsDb' in sqlite3.oo1)) {
-      // 根据文档，OpfsDb 应该可用。如果不可用，可能是版本问题或环境问题
-      console.error("OpfsDb not available in sqlite3.oo1. Available classes:", Object.keys(sqlite3.oo1));
-      
-      // 检查是否有 OPFS VFS
-      if ('capi' in sqlite3 && sqlite3.capi.sqlite3_vfs_find) {
-        const opfsVfs = sqlite3.capi.sqlite3_vfs_find('opfs');
-        console.log("OPFS VFS status:", opfsVfs ? "Found" : "Not found");
-      }
-      
-      throw new Error("OpfsDb is not available in SQLite WASM. This application requires OPFS support. Please ensure you are using a compatible browser and that COOP/COEP headers are properly set.");
-    }
-
-    console.log("Creating OPFS database...");
-    // 创建 OPFS 数据库（这是唯一允许的方式，必须使用 OPFS）
-    db = new sqlite3.oo1.OpfsDb('/gitdb_data.db');
-    console.log("Storage: OPFS persistence active");
     
-    return db;
+    dbId = openResponse.result.dbId;
+    console.log("Storage: OPFS persistence active, database opened");
+    
+    return { dbId, promiser };
   } catch (err) {
     console.error("SQLite Initialization Error:", err);
     throw err;
   }
 };
 
-export const getDB = () => db;
+// 兼容性：保持原有的 getDB API
+export const getDB = () => {
+  if (dbId === null || !promiser) {
+    throw new Error("Database not initialized");
+  }
+  return { dbId, promiser };
+};
 
-export const executeQuery = (sql: string, params: any[] = []) => {
-  if (!db) throw new Error("Database not initialized");
-  const rows: any[] = [];
+export const executeQuery = async (sql: string, params: any[] = []) => {
+  if (dbId === null || !promiser) {
+    throw new Error("Database not initialized");
+  }
+  
   try {
-    db.exec({
+    // 使用 Worker1 API 执行查询
+    const response = await promiser('exec', {
+      dbId,
       sql,
       bind: params,
-      rowMode: 'object',
-      callback: (row: any) => rows.push(row)
+      returnValue: 'resultRows',
+      rowMode: 'object'
     });
-    return rows;
+    
+    if (response.result.code !== 0) {
+      throw new Error(response.result.message || 'Query execution failed');
+    }
+    
+    return response.result.resultRows || [];
   } catch (err) {
     console.error("Query Error:", sql, err);
     throw err;
   }
 };
 
-export const getTables = () => {
-  if (!db) return [];
-  return executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+export const getTables = async () => {
+  if (dbId === null) return [];
+  return await executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
 };
 
-export const getTableInfo = (tableName: string) => {
-  if (!db) return [];
-  return executeQuery(`PRAGMA table_info('${tableName}')`);
+export const getTableInfo = async (tableName: string) => {
+  if (dbId === null) return [];
+  return await executeQuery(`PRAGMA table_info('${tableName}')`);
 };
 
 export const exportDatabase = async (): Promise<Uint8Array> => {
-  if (!db) throw new Error("DB not initialized");
-  
-  // 应用必须使用 OPFS，直接从文件系统读取，避免内存问题
-  if (!(db instanceof sqlite3.oo1.OpfsDb)) {
-    throw new Error("Database must use OPFS storage. This application requires OPFS.");
+  if (dbId === null || !promiser) {
+    throw new Error("DB not initialized");
   }
 
   try {
+    // 应用必须使用 OPFS，直接从文件系统读取，避免内存问题
+    // 即使使用 Worker1 API，数据库文件仍然存储在 OPFS 中
     const root = await navigator.storage.getDirectory();
     const fileHandle = await root.getFileHandle('gitdb_data.db');
     const file = await fileHandle.getFile();
@@ -232,10 +210,14 @@ export const exportDatabase = async (): Promise<Uint8Array> => {
 };
 
 export const importDatabase = async (data: Uint8Array) => {
-  if (!sqlite3) await initSQLite();
+  if (!promiser) {
+    await initSQLite();
+  }
   
-  if (db) {
-    db.close();
+  if (dbId !== null) {
+    // 关闭现有数据库
+    await promiser('close', { dbId });
+    dbId = null;
   }
   
   // 应用必须使用 OPFS
@@ -244,17 +226,27 @@ export const importDatabase = async (data: Uint8Array) => {
   }
 
   try {
+    // 将数据写入 OPFS
     const root = await navigator.storage.getDirectory();
     const fileHandle = await root.getFileHandle('gitdb_data.db', { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(data as any);
     await writable.close();
     
-    db = new sqlite3.oo1.OpfsDb('/gitdb_data.db');
+    // 重新打开数据库
+    const openResponse = await promiser('open', {
+      filename: 'file:gitdb_data.db?vfs=opfs',
+    });
+    
+    if (openResponse.result.code !== 0) {
+      throw new Error(`Failed to open imported database: ${openResponse.result.message || 'Unknown error'}`);
+    }
+    
+    dbId = openResponse.result.dbId;
     console.log("Database imported to OPFS");
+    
+    return { dbId, promiser };
   } catch (err: any) {
     throw new Error(`Failed to import database to OPFS: ${err.message}`);
   }
-  
-  return db;
 };
