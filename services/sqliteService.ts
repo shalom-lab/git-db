@@ -108,11 +108,17 @@ export const initSQLite = async () => {
       ? new URL('.', window.location.href).pathname 
       : '/git-db/';
     const wasmPath = `${basePath}sqlite3.wasm`;
+    const workerPath = `${basePath}sqlite3-worker1.mjs`;
     console.log("WASM file path:", wasmPath);
+    console.log("Worker file path:", workerPath);
     
     promiser = await new Promise((resolve, reject) => {
       try {
         const _promiser = sqlite3Module.sqlite3Worker1Promiser({
+          // 显式指定 Worker 文件路径，确保使用根目录的文件（不被 Vite 处理）
+          worker: () => {
+            return new Worker(workerPath, { type: 'module' });
+          },
           // 配置 WASM 文件的路径，确保 Worker 能找到它
           // 在 GitHub Pages 上，base 路径是 /git-db/，所以需要完整路径
           locateFile: (file: string) => {

@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
               dest: '.', // OPFS 代理文件（OPFS 模式需要）
             },
           ],
+          // 确保文件不被 Vite 处理，直接复制到输出目录
+          structured: false,
         }),
       ],
       resolve: {
