@@ -30,7 +30,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
     }
   };
 
-  const REPO_URL = "https://github.com/shalom-lab/gitdb"; // Updated to match likely repo name
+  const REPO_URL = "https://github.com/shalom-lab/git-db"; // Updated to match likely repo name
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-12">
