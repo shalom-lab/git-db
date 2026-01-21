@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   Database, GitBranch, Github, Settings, Plus, Save, Download, 
   RefreshCcw, Search, Trash2, Edit, Terminal, FileCode, 
-  CheckCircle2, XCircle, Rocket, Sun, Moon, Monitor, AlertTriangle 
+  CheckCircle2, XCircle, Rocket, Sun, Moon, Monitor, AlertTriangle, Star
 } from 'lucide-react';
 
 export const APP_NAME = "GitDB";
@@ -65,7 +65,9 @@ export const I18N = {
       no_rows: "This table is currently empty.",
       sql_help: "Supports comments (-- comment). Enter SQL and press Run.",
       welcome_title: "Ready to Sync?",
-      welcome_desc: "Connect your GitHub repository to enable persistent cloud storage and multi-device sync."
+      welcome_desc: "Connect your GitHub repository to enable persistent cloud storage and multi-device sync.",
+      explorer_title: "Explorer GitDB",
+      explorer_desc: "Select a table or use SQL terminal."
     },
     theme: {
       light: "Light",
@@ -130,7 +132,9 @@ export const I18N = {
       no_rows: "当前表没有数据",
       sql_help: "支持注释 (-- 注释)。输入 SQL，点击执行或按 Ctrl+Enter",
       welcome_title: "开启云端同步",
-      welcome_desc: "连接 GitHub 仓库，开启持久化云端存储与多端同步功能。"
+      welcome_desc: "连接 GitHub 仓库，开启持久化云端存储与多端同步功能。",
+      explorer_title: "探索 GitDB",
+      explorer_desc: "选择一个数据表或使用 SQL 终端。"
     },
     theme: {
       light: "浅色",
@@ -163,5 +167,6 @@ export const ICONS = {
   Sun: <Sun size={14} />,
   Moon: <Moon size={14} />,
   Monitor: <Monitor size={14} />,
-  Warning: <AlertTriangle size={14} />
+  Warning: <AlertTriangle size={14} />,
+  Star: <Star size={16} />
 };

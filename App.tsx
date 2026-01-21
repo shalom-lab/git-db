@@ -381,8 +381,8 @@ const App: React.FC = () => {
                   {!state.config ? ICONS.Rocket : ICONS.Database}
                </div>
                <div className="text-center max-w-xs space-y-3">
-                  <p className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-[0.3em]">{!state.config ? t.empty.welcome_title : 'Explorer GitDB'}</p>
-                  <p className="text-[12px] text-gray-400 dark:text-gray-500 leading-relaxed font-medium">{!state.config ? t.empty.welcome_desc : 'Select a table or use SQL terminal.'}</p>
+                  <p className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-[0.3em]">{!state.config ? t.empty.welcome_title : t.empty.explorer_title}</p>
+                  <p className="text-[12px] text-gray-400 dark:text-gray-500 leading-relaxed font-medium">{!state.config ? t.empty.welcome_desc : t.empty.explorer_desc}</p>
                   {!state.config && <button onClick={() => setView('settings')} className="mt-4 bg-primary text-white px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">{t.actions.get_started}</button>}
                </div>
             </div>

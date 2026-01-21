@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Star } from 'lucide-react';
 import { GithubConfig, Language } from '../types';
 import { I18N, ICONS, DEFAULT_DB_PATH, DEFAULT_BRANCH } from '../constants';
 
@@ -35,7 +36,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-12">
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 relative z-10">
           <h3 className="text-lg font-bold flex items-center space-x-2">
             {ICONS.Settings}
             <span>{t.settings.connection}</span>
@@ -131,9 +132,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
               href={REPO_URL + "/stargazers"} 
               target="_blank" 
               rel="noreferrer"
-              className="flex items-center space-x-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-6 py-2 rounded-xl text-[11px] font-bold tracking-widest uppercase transition-all hover:border-primary hover:text-primary active:scale-95 shadow-sm"
+              className="group flex items-center space-x-2 border-2 border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-6 py-2 rounded-xl text-[11px] font-bold tracking-widest uppercase transition-all hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:shadow-lg hover:shadow-amber-200/50 dark:hover:shadow-amber-900/20 active:scale-95"
             >
-              {lang === Language.EN ? "Give a Star" : "给个 Star"}
+              <Star className="w-4 h-4 fill-amber-400 dark:fill-amber-500 text-amber-400 dark:text-amber-500 group-hover:fill-amber-500 dark:group-hover:fill-amber-400 transition-all group-hover:scale-110" />
+              <span>{lang === Language.EN ? "Give a Star" : "给个 Star"}</span>
             </a>
           </div>
 
