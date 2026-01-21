@@ -105,7 +105,12 @@ export const initSQLite = async () => {
     
     // 步骤4: 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
     console.log("Step 4: Initializing SQLite WASM...");
-    sqlite3 = await sqlite3Module.default();
+    // SQLite WASM 从 CDN 加载时，需要正确配置 WASM 文件的路径
+    // 使用默认初始化，让 SQLite WASM 自己处理 WASM 文件路径（从 CDN 加载）
+    sqlite3 = await sqlite3Module.default({
+      // 如果 SQLite WASM 需要额外的配置，可以在这里指定
+      // 默认情况下，它会从 CDN 正确加载 WASM 文件
+    });
     console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
     // 再次确认环境状态（确保在 SQLite WASM 初始化后仍然有效）

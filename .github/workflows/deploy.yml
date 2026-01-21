@@ -37,6 +37,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Copy GitHub Pages config files
+        run: |
+          cp public/_headers dist/_headers || true
+          cp public/.nojekyll dist/.nojekyll || true
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
