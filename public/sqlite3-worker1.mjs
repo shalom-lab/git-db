@@ -9129,7 +9129,7 @@ async function sqlite3InitModule(moduleArg = {}) {
 						promiseWasRejected = false;
 						return promiseResolve_(sqlite3);
 					};
-					const W = new Worker(new URL(options.proxyUri, import.meta.url));
+					const W = new Worker(new URL(options.proxyUri, import.meta.url), { type: 'module' });
 					setTimeout(() => {
 						if (void 0 === promiseWasRejected) promiseReject(/* @__PURE__ */ new Error("Timeout while waiting for OPFS async proxy worker."));
 					}, 4e3);
@@ -9790,7 +9790,7 @@ async function sqlite3InitModule(moduleArg = {}) {
 					};
 				});
 			};
-			installOpfsVfs.defaultProxyUri = "sqlite3-opfs-async-proxy.js";
+			installOpfsVfs.defaultProxyUri = "sqlite3-opfs-async-proxy.mjs";
 			globalThis.sqlite3ApiBootstrap.initializersAsync.push(async (sqlite3$1) => {
 				try {
 					let proxyJs = installOpfsVfs.defaultProxyUri;
