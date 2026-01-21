@@ -1,0 +1,6 @@
+
+{
+  "name": "GitDB",
+  "description": "Local-First SQLite Manager, Synced with GitHub. A serverless database management tool using SQLite-WASM and OPFS.",
+  "requestFramePermissions": []
+}
