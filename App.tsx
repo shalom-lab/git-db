@@ -154,7 +154,7 @@ const App: React.FC = () => {
   const refreshTables = async () => {
     try {
       const tableList = await getTables();
-      console.log("Tables found:", tableList);
+      // console.log("Tables found:", tableList);
       setTables(tableList);
       // 如果有表格，确保自动加载第一个表格
       if (tableList.length > 0) {
@@ -162,9 +162,10 @@ const App: React.FC = () => {
         if (!state.currentTable || !tableList.find((t: any) => t.name === state.currentTable)) {
           await loadTable(tableList[0].name, 0);
         }
-      } else {
-        console.log("No tables found in database. Database is empty or tables need to be created.");
       }
+      // else {
+      //   console.log("No tables found in database. Database is empty or tables need to be created.");
+      // }
     } catch (e) { 
       console.error("Table refresh failed", e); 
     }
@@ -329,18 +330,18 @@ const App: React.FC = () => {
             <div className="flex flex-col h-full space-y-4">
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col">
                 <div className="overflow-auto custom-scrollbar flex-1">
-                  <table className="w-full text-left text-[13px]">
+                  <table className="w-full text-left text-[14px]">
                     <thead className="bg-gray-50/50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm">
                       <tr>
                         {currentTableInfo?.columns.map(col => (
-                          <th key={col.name} className="px-6 py-4 font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter text-[10px]">
+                          <th key={col.name} className="px-6 py-4 font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter text-[11px]">
                             <div className="flex items-center space-x-1.5">
                               <span>{col.name}</span>
-                              {col.pk === 1 && <span className="text-[8px] bg-yellow-400/20 text-yellow-600 px-1.5 py-0.5 rounded font-black tracking-widest">PK</span>}
+                              {col.pk === 1 && <span className="text-[9px] bg-yellow-400/20 text-yellow-600 px-1.5 py-0.5 rounded font-black tracking-widest">PK</span>}
                             </div>
                           </th>
                         ))}
-                        <th className="px-6 py-4 text-right uppercase tracking-tighter font-black text-gray-400 text-[10px]">Actions</th>
+                        <th className="px-6 py-4 text-right uppercase tracking-tighter font-black text-gray-400 text-[11px]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -349,7 +350,7 @@ const App: React.FC = () => {
                       ) : rows.map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors group">
                           {currentTableInfo?.columns.map(col => (
-                            <td key={col.name} className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400 mono text-[12px] group-hover:text-gray-900 dark:group-hover:text-gray-100">
+                            <td key={col.name} className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400 mono text-[13px] group-hover:text-gray-900 dark:group-hover:text-gray-100">
                               {row[col.name]?.toString() ?? <span className="text-gray-200 dark:text-gray-700 italic opacity-40">null</span>}
                             </td>
                           ))}
@@ -367,7 +368,7 @@ const App: React.FC = () => {
               </div>
               
               {/* Pagination UI */}
-              <div className="flex items-center justify-between px-2 text-[11px] font-bold text-gray-400">
+              <div className="flex items-center justify-between px-2 text-[13px] font-bold text-gray-400">
                 <div className="flex items-center space-x-2">
                   <span>Total: {totalRows}</span>
                   <span className="opacity-30">|</span>

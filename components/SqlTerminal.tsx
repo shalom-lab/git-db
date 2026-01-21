@@ -25,6 +25,14 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
     }
   };
 
+  // 同步光标位置和滚动
+  const syncScrollAndCursor = () => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
+
   const highlightSQL = (code: string) => {
     if (!code) return '';
     
@@ -100,7 +108,30 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
     }
   };
 
-  useEffect(() => { handleScroll(); }, [query]);
+  useEffect(() => { 
+    syncScrollAndCursor();
+  }, [query]);
+
+  // 监听输入事件，实时同步滚动
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const handleInput = () => {
+        syncScrollAndCursor();
+      };
+      const handleSelectionChange = () => {
+        syncScrollAndCursor();
+      };
+      textarea.addEventListener('input', handleInput);
+      textarea.addEventListener('scroll', handleScroll);
+      textarea.addEventListener('select', handleSelectionChange);
+      return () => {
+        textarea.removeEventListener('input', handleInput);
+        textarea.removeEventListener('scroll', handleScroll);
+        textarea.removeEventListener('select', handleSelectionChange);
+      };
+    }
+  }, []);
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-in fade-in duration-300">
@@ -128,19 +159,26 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
           <pre
             ref={preRef}
             aria-hidden="true"
-            className="absolute inset-0 p-6 mono text-[13px] leading-[1.6] whitespace-pre-wrap break-all pointer-events-none overflow-auto custom-scrollbar transition-colors select-none z-10 border-none"
+            className="absolute inset-0 p-6 mono text-[14px] leading-[1.7] whitespace-pre-wrap break-all pointer-events-none overflow-auto custom-scrollbar transition-colors select-none z-10 border-none"
             dangerouslySetInnerHTML={{ __html: highlightSQL(query) }}
             style={{ margin: 0, fontFeatureSettings: '"liga" 0' }}
           />
           {/* Input Layer (Front) */}
           <textarea
             ref={textareaRef}
-            className="absolute inset-0 w-full h-full p-6 mono text-[13px] leading-[1.6] bg-transparent outline-none resize-none text-transparent caret-gray-900 dark:caret-white whitespace-pre-wrap break-all overflow-auto custom-scrollbar transition-colors z-20 border-none focus:ring-0"
+            className="absolute inset-0 w-full h-full p-6 mono text-[14px] leading-[1.7] bg-transparent outline-none resize-none text-transparent caret-gray-900 dark:caret-white whitespace-pre-wrap break-all overflow-auto custom-scrollbar transition-colors z-20 border-none focus:ring-0"
             placeholder={`-- Write your SQL here...\nCREATE TABLE demo (id INTEGER PRIMARY KEY);`}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // 立即同步滚动
+              requestAnimationFrame(() => {
+                syncScrollAndCursor();
+              });
+            }}
             onKeyDown={handleKeyDown}
             onScroll={handleScroll}
+            onSelect={syncScrollAndCursor}
             spellCheck={false}
             style={{ fontFeatureSettings: '"liga" 0' }}
           />
@@ -154,7 +192,7 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl flex items-start space-x-3 animate-in slide-in-from-top-2 z-10">
           <span className="text-red-500 mt-0.5">{ICONS.Error}</span>
           <div className="space-y-1">
-            <p className="text-[11px] text-red-700 dark:text-red-400 font-mono font-bold leading-tight">{error}</p>
+            <p className="text-[13px] text-red-700 dark:text-red-400 font-mono font-bold leading-tight">{error}</p>
           </div>
         </div>
       )}
@@ -164,19 +202,19 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
            <div className="flex items-center space-x-3">
              <div className="flex items-center space-x-1.5">
                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-               <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{results.length} Results</span>
+               <span className="text-[12px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{results.length} Results</span>
              </div>
-             {execTime && <span className="text-[9px] font-bold text-gray-300 dark:text-gray-600 mono px-2 py-0.5 bg-gray-50 dark:bg-gray-700 rounded-full">{execTime.toFixed(2)}ms</span>}
+             {execTime && <span className="text-[11px] font-bold text-gray-300 dark:text-gray-600 mono px-2 py-0.5 bg-gray-50 dark:bg-gray-700 rounded-full">{execTime.toFixed(2)}ms</span>}
            </div>
         </div>
         
         <div className="flex-1 overflow-auto custom-scrollbar">
           {results.length > 0 ? (
-            <table className="w-full text-left text-[11px] border-collapse">
+            <table className="w-full text-left text-[13px] border-collapse">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   {Object.keys(results[0]).map(key => (
-                    <th key={key} className="px-6 py-3 font-black text-gray-400 dark:text-gray-500 bg-gray-50/50 dark:bg-gray-800/80 backdrop-blur-md uppercase tracking-tighter text-[10px]">{key}</th>
+                    <th key={key} className="px-6 py-3 font-black text-gray-400 dark:text-gray-500 bg-gray-50/50 dark:bg-gray-800/80 backdrop-blur-md uppercase tracking-tighter text-[11px]">{key}</th>
                   ))}
                 </tr>
               </thead>
@@ -198,8 +236,8 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
                   {React.cloneElement(ICONS.Terminal as React.ReactElement<any>, { size: 64, strokeWidth: 1 })}
                </div>
                <div className="text-center space-y-1">
-                 <p className="text-[11px] font-black uppercase tracking-[0.3em]">{t.empty.sql_help}</p>
-                 <p className="text-[10px] opacity-60">Result set will appear here after execution</p>
+                 <p className="text-[13px] font-black uppercase tracking-[0.3em]">{t.empty.sql_help}</p>
+                 <p className="text-[12px] opacity-60">Result set will appear here after execution</p>
                </div>
             </div>
           )}

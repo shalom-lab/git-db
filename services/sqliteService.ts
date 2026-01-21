@@ -15,13 +15,13 @@ const waitForServiceWorkerReady = async (maxWait = 10000): Promise<boolean> => {
   try {
     // 等待 Service Worker 注册完成
     const registration = await navigator.serviceWorker.ready;
-    console.log("Service Worker ready:", registration.active?.state);
+    // console.log("Service Worker ready:", registration.active?.state);
     
     // 如果 Service Worker 已激活，等待一小段时间确保它完全控制页面
     if (registration.active && registration.active.state === 'activated') {
       // 等待 controller 可用（如果支持）
       if (navigator.serviceWorker.controller) {
-        console.log("Service Worker controller is available");
+        // console.log("Service Worker controller is available");
         return true;
       }
       // 即使没有 controller，如果已激活也应该可以
@@ -51,11 +51,11 @@ const waitForCrossOriginIsolated = async (maxWait = 15000): Promise<boolean> => 
     const checkInterval = setInterval(() => {
       if (typeof window !== 'undefined' && window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined') {
         clearInterval(checkInterval);
-        console.log("crossOriginIsolated and SharedArrayBuffer are ready");
+        // console.log("crossOriginIsolated and SharedArrayBuffer are ready");
         resolve(true);
       } else if (Date.now() - startTime > maxWait) {
         clearInterval(checkInterval);
-        console.warn(`crossOriginIsolated not available after ${maxWait}ms. Service Worker may need more time to activate.`);
+        // console.warn(`crossOriginIsolated not available after ${maxWait}ms. Service Worker may need more time to activate.`);
         resolve(false);
       }
     }, 50); // 更频繁的检查
@@ -75,11 +75,11 @@ export const initSQLite = async () => {
 
   try {
     // 步骤1: 等待 Service Worker 完全准备好
-    console.log("Step 1: Waiting for Service Worker to be ready...");
+    // console.log("Step 1: Waiting for Service Worker to be ready...");
     await waitForServiceWorkerReady(10000);
     
     // 步骤2: 等待 crossOriginIsolated 环境准备就绪（最多等待15秒）
-    console.log("Step 2: Waiting for crossOriginIsolated environment...");
+    // console.log("Step 2: Waiting for crossOriginIsolated environment...");
     const isCrossOriginIsolated = await waitForCrossOriginIsolated(15000);
     
     // 严格检查：应用必须使用 OPFS，环境不满足就报错
@@ -91,16 +91,16 @@ export const initSQLite = async () => {
       throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Service Worker may need more time. Please refresh the page - the app will reload automatically when Service Worker is ready.");
     }
 
-    console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
+    // console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
     // 步骤3: 动态导入 SQLite WASM（使用 Wrapped Worker 方式，支持 OPFS）
     // 现在使用本地安装的版本，而不是从 CDN 加载
     if (!sqlite3Module) {
       sqlite3Module = await import('@sqlite.org/sqlite-wasm');
-      console.log("SQLite WASM module loaded from node_modules");
+      // console.log("SQLite WASM module loaded from node_modules");
     }
     
     // 步骤4: 初始化 SQLite WASM Wrapped Worker（这是唯一支持 OPFS 的方式）
-    console.log("Step 4: Initializing SQLite WASM with Wrapped Worker (OPFS support)...");
+    // console.log("Step 4: Initializing SQLite WASM with Wrapped Worker (OPFS support)...");
     
     // 使用 public 目录中的手动修改过的文件（确保 OPFS Worker 使用 type: 'module'）
     // 在 GitHub Pages 上，base 路径是 /git-db/，需要确保 Worker 能找到 WASM 文件
@@ -110,8 +110,8 @@ export const initSQLite = async () => {
       : '/git-db/';
     const wasmPath = `${basePath}sqlite3.wasm`;
     const workerPath = `${basePath}sqlite3-worker1.mjs`;
-    console.log("WASM file path:", wasmPath);
-    console.log("Worker file path:", workerPath);
+    // console.log("WASM file path:", wasmPath);
+    // console.log("Worker file path:", workerPath);
     
     promiser = await new Promise((resolve, reject) => {
       try {
@@ -130,7 +130,7 @@ export const initSQLite = async () => {
             return file;
           },
           onready: () => {
-            console.log("SQLite WASM Worker ready");
+            // console.log("SQLite WASM Worker ready");
             resolve(_promiser);
           },
           onerror: (err: any) => {
@@ -146,16 +146,16 @@ export const initSQLite = async () => {
 
     // 获取版本信息
     const configResponse = await promiser('config-get', {});
-    console.log("SQLite3 loaded version:", configResponse.result.version.libVersion);
+    // console.log("SQLite3 loaded version:", configResponse.result.version.libVersion);
 
     // 步骤5: 打开 OPFS 数据库（必须使用 OPFS）
-    console.log("Step 5: Opening OPFS database...");
+    // console.log("Step 5: Opening OPFS database...");
     const openResponse = await promiser('open', {
       filename: 'file:gitdb_data.db?vfs=opfs',
     });
     
     // 输出详细的响应信息以便调试
-    console.log("Open database response:", JSON.stringify(openResponse, null, 2));
+    // console.log("Open database response:", JSON.stringify(openResponse, null, 2));
     
     // 🛑 修复：检查是否出错，而不是检查 code !== 0
     // 在 sqlite3Worker1Promiser API 中：
@@ -179,8 +179,8 @@ export const initSQLite = async () => {
     
     // 成功！
     dbId = openResponse.result.dbId;
-    console.log("✅ Database opened successfully. ID:", dbId);
-    console.log("Storage: OPFS persistence active, database opened");
+    // console.log("✅ Database opened successfully. ID:", dbId);
+    // console.log("Storage: OPFS persistence active, database opened");
     
     return { dbId, promiser };
   } catch (err) {
@@ -302,7 +302,7 @@ export const importDatabase = async (data: Uint8Array) => {
     }
     
     dbId = openResponse.result.dbId;
-    console.log("Database imported to OPFS");
+    // console.log("Database imported to OPFS");
     
     return { dbId, promiser };
   } catch (err: any) {
