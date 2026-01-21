@@ -29,5 +29,15 @@ export default defineConfig(({ mode }) => {
       optimizeDeps: {
         exclude: ['@sqlite.org/sqlite-wasm'],
       },
+      build: {
+        rollupOptions: {
+          external: (id) => {
+            // 在浏览器中，importmap 会处理 '@sqlite.org/sqlite-wasm'
+            // 但在构建时，我们可能需要保持它为外部依赖
+            // 不过，对于浏览器构建，Vite 通常不会打包 node_modules
+            return false;
+          },
+        },
+      },
     };
 });

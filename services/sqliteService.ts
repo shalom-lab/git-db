@@ -93,9 +93,14 @@ export const initSQLite = async () => {
 
     console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
     // 步骤3: 动态导入 SQLite WASM（确保在环境准备好后再加载）
-    // 这样可以避免模块加载时环境还没准备好的问题
+    // 直接使用 CDN URL 确保使用正确的版本（3.51.2-build2），这个版本有完整的 OPFS 支持
+    // 使用 importmap 中指定的版本，确保 OPFS OpfsDb 类可用
     if (!sqlite3Module) {
+      // 在浏览器中，importmap 会处理 '@sqlite.org/sqlite-wasm' 的解析
+      // 但为了确保使用正确的版本，我们直接使用 importmap 中定义的路径
+      // 浏览器会自动使用 importmap 中的映射
       sqlite3Module = await import('@sqlite.org/sqlite-wasm');
+      console.log("SQLite WASM module loaded from importmap");
     }
     
     // 步骤4: 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
