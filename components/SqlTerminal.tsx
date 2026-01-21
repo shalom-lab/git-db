@@ -61,12 +61,13 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
     }) + '\n';
   };
 
-  const handleRun = () => {
+  const handleRun = async () => {
     if (!query.trim()) return;
     setError(null);
+    setResults([]);
     const start = performance.now();
     try {
-      const data = executeQuery(query);
+      const data = await executeQuery(query);
       setResults(data);
       setExecTime(performance.now() - start);
 

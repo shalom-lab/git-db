@@ -154,6 +154,7 @@ const App: React.FC = () => {
   const refreshTables = async () => {
     try {
       const tableList = await getTables();
+      console.log("Tables found:", tableList);
       setTables(tableList);
       // 如果有表格，确保自动加载第一个表格
       if (tableList.length > 0) {
@@ -161,6 +162,8 @@ const App: React.FC = () => {
         if (!state.currentTable || !tableList.find((t: any) => t.name === state.currentTable)) {
           await loadTable(tableList[0].name, 0);
         }
+      } else {
+        console.log("No tables found in database. Database is empty or tables need to be created.");
       }
     } catch (e) { 
       console.error("Table refresh failed", e); 
