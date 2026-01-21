@@ -101,6 +101,8 @@ export const initSQLite = async () => {
     // 步骤4: 初始化 SQLite WASM Wrapped Worker（这是唯一支持 OPFS 的方式）
     console.log("Step 4: Initializing SQLite WASM with Wrapped Worker (OPFS support)...");
     
+    // sqlite3Worker1Promiser 会自动处理 Worker 和 WASM 文件的加载
+    // 从 CDN 加载时，它会自动从相同的 CDN 路径加载相关文件
     promiser = await new Promise((resolve, reject) => {
       try {
         const _promiser = sqlite3Module.sqlite3Worker1Promiser({
@@ -114,6 +116,7 @@ export const initSQLite = async () => {
           }
         });
       } catch (err) {
+        console.error("Failed to create sqlite3Worker1Promiser:", err);
         reject(err);
       }
     });
