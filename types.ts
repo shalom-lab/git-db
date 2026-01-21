@@ -2,7 +2,6 @@
 export interface GithubConfig {
   token: string;
   repo: string;
-  branch: string;
   path: string;
 }
 

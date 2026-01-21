@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GithubConfig, Language } from '../types';
-import { I18N, ICONS, DEFAULT_DB_PATH, DEFAULT_BRANCH } from '../constants';
+import { I18N, ICONS, DEFAULT_DB_PATH } from '../constants';
 
 interface AuthGuardProps {
   onSave: (config: GithubConfig) => void;
@@ -20,7 +20,6 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ onSave, lang }) => {
       onSave({
         token: token.trim(),
         repo: repo.trim(),
-        branch: DEFAULT_BRANCH,
         path: path.trim() || DEFAULT_DB_PATH
       });
     }

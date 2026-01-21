@@ -8,7 +8,6 @@ import {
 
 export const APP_NAME = "GitDB";
 export const DEFAULT_DB_PATH = "db/database.sqlite";
-export const DEFAULT_BRANCH = "master";
 
 export const I18N = {
   en: {

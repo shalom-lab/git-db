@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 import { GithubConfig, Language } from '../types';
-import { I18N, ICONS, DEFAULT_DB_PATH, DEFAULT_BRANCH } from '../constants';
+import { I18N, ICONS, DEFAULT_DB_PATH } from '../constants';
 
 interface SettingsViewProps {
   config: GithubConfig | null;
@@ -14,8 +14,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
   const [localConfig, setLocalConfig] = useState<GithubConfig>(config || {
     token: '',
     repo: '',
-    path: DEFAULT_DB_PATH,
-    branch: DEFAULT_BRANCH
+    path: DEFAULT_DB_PATH
   });
   const t = I18N[lang];
 
