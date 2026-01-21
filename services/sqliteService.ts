@@ -102,12 +102,26 @@ export const initSQLite = async () => {
     // 步骤4: 初始化 SQLite WASM Wrapped Worker（这是唯一支持 OPFS 的方式）
     console.log("Step 4: Initializing SQLite WASM with Wrapped Worker (OPFS support)...");
     
-    // sqlite3Worker1Promiser 会自动处理 Worker 和 WASM 文件的加载
-    // 从 CDN 加载时，它会自动从相同的 CDN 路径加载相关文件
-    // 不需要显式指定 worker 路径，它会自动处理
+    // 在 GitHub Pages 上，base 路径是 /git-db/，需要确保 Worker 能找到 WASM 文件
+    // 获取当前页面的 base 路径
+    const basePath = typeof window !== 'undefined' 
+      ? new URL('.', window.location.href).pathname 
+      : '/git-db/';
+    const wasmPath = `${basePath}sqlite3.wasm`;
+    console.log("WASM file path:", wasmPath);
+    
     promiser = await new Promise((resolve, reject) => {
       try {
         const _promiser = sqlite3Module.sqlite3Worker1Promiser({
+          // 配置 WASM 文件的路径，确保 Worker 能找到它
+          // 在 GitHub Pages 上，base 路径是 /git-db/，所以需要完整路径
+          locateFile: (file: string) => {
+            if (file.endsWith('.wasm')) {
+              return wasmPath;
+            }
+            // 其他文件（如 Worker 文件）使用默认路径
+            return file;
+          },
           onready: () => {
             console.log("SQLite WASM Worker ready");
             resolve(_promiser);
