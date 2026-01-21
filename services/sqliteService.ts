@@ -93,9 +93,10 @@ export const initSQLite = async () => {
 
     console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
     // 步骤3: 动态导入 SQLite WASM（使用 Wrapped Worker 方式，支持 OPFS）
+    // 现在使用本地安装的版本，而不是从 CDN 加载
     if (!sqlite3Module) {
       sqlite3Module = await import('@sqlite.org/sqlite-wasm');
-      console.log("SQLite WASM module loaded from importmap");
+      console.log("SQLite WASM module loaded from node_modules");
     }
     
     // 步骤4: 初始化 SQLite WASM Wrapped Worker（这是唯一支持 OPFS 的方式）
