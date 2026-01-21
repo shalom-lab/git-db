@@ -51,23 +51,36 @@ export default defineConfig(({ mode }) => {
         {
           name: 'fix-opfs-worker',
           writeBundle() {
-            const workerPath = path.resolve(__dirname, 'dist/sqlite3-worker1.mjs');
-            if (fs.existsSync(workerPath)) {
-              let content = fs.readFileSync(workerPath, 'utf-8');
-              // 查找并替换 Worker 创建代码，添加 type: 'module'
-              // 匹配: new Worker(new URL(options.proxyUri, import.meta.url))
-              // 替换为: new Worker(new URL(options.proxyUri, import.meta.url), { type: 'module' })
-              content = content.replace(
-                /new Worker\(new URL\(options\.proxyUri,\s*import\.meta\.url\)\)/g,
-                "new Worker(new URL(options.proxyUri, import.meta.url), { type: 'module' })"
-              );
-              // 同时修复默认的 proxy URI 为 .mjs
-              content = content.replace(
-                /installOpfsVfs\.defaultProxyUri\s*=\s*"sqlite3-opfs-async-proxy\.js"/g,
-                'installOpfsVfs.defaultProxyUri = "sqlite3-opfs-async-proxy.mjs"'
-              );
-              fs.writeFileSync(workerPath, content, 'utf-8');
-              console.log('Fixed OPFS Worker to use type: module');
+            const distDir = path.resolve(__dirname, 'dist');
+            // 查找所有可能的 Worker 文件位置
+            const workerPaths = [
+              path.join(distDir, 'sqlite3-worker1.mjs'),
+              ...fs.readdirSync(distDir, { recursive: true })
+                .filter((file: string) => file.includes('worker') && file.endsWith('.mjs'))
+                .map((file: string) => path.join(distDir, file))
+            ];
+            
+            for (const workerPath of workerPaths) {
+              if (fs.existsSync(workerPath)) {
+                let content = fs.readFileSync(workerPath, 'utf-8');
+                // 查找并替换 Worker 创建代码，添加 type: 'module'
+                // 匹配: new Worker(new URL(options.proxyUri, import.meta.url))
+                // 替换为: new Worker(new URL(options.proxyUri, import.meta.url), { type: 'module' })
+                const originalContent = content;
+                content = content.replace(
+                  /new Worker\(new URL\(options\.proxyUri,\s*import\.meta\.url\)\)/g,
+                  "new Worker(new URL(options.proxyUri, import.meta.url), { type: 'module' })"
+                );
+                // 同时修复默认的 proxy URI 为 .mjs
+                content = content.replace(
+                  /installOpfsVfs\.defaultProxyUri\s*=\s*"sqlite3-opfs-async-proxy\.js"/g,
+                  'installOpfsVfs.defaultProxyUri = "sqlite3-opfs-async-proxy.mjs"'
+                );
+                if (content !== originalContent) {
+                  fs.writeFileSync(workerPath, content, 'utf-8');
+                  console.log(`Fixed OPFS Worker at ${workerPath} to use type: module`);
+                }
+              }
             }
           },
         },
