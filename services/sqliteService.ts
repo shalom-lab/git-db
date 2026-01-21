@@ -9,24 +9,24 @@ let db: any = null;
  * Service Worker 可能需要一些时间才能激活并设置正确的 COOP/COEP 头
  * 在 GitHub Pages 上，Service Worker 需要时间接管页面
  */
-const waitForCrossOriginIsolated = async (maxWait = 10000): Promise<boolean> => {
+const waitForCrossOriginIsolated = async (maxWait = 15000): Promise<boolean> => {
   // 如果已经准备好了，直接返回
-  if (typeof window !== 'undefined' && window.crossOriginIsolated) {
+  if (typeof window !== 'undefined' && window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined') {
+    // 确保 Service Worker 已注册并可能控制页面（如果支持）
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      return true;
+    }
+    // 即使没有 controller，如果 crossOriginIsolated 为 true，也应该可以
     return true;
   }
 
   const startTime = Date.now();
   return new Promise((resolve) => {
     const checkInterval = setInterval(() => {
-      if (typeof window !== 'undefined' && window.crossOriginIsolated) {
+      if (typeof window !== 'undefined' && window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined') {
         clearInterval(checkInterval);
-        // 确保 SharedArrayBuffer 也可用
-        if (typeof SharedArrayBuffer !== 'undefined') {
-          resolve(true);
-        } else {
-          console.warn("crossOriginIsolated is true but SharedArrayBuffer is not available");
-          resolve(false);
-        }
+        console.log("crossOriginIsolated and SharedArrayBuffer are ready");
+        resolve(true);
       } else if (Date.now() - startTime > maxWait) {
         clearInterval(checkInterval);
         console.warn(`crossOriginIsolated not available after ${maxWait}ms. Service Worker may need more time to activate.`);
@@ -48,24 +48,27 @@ export const initSQLite = async () => {
   if (db) return db;
 
   try {
-    // 等待 crossOriginIsolated 环境准备就绪
+    // 等待 crossOriginIsolated 环境准备就绪（最多等待15秒）
     // Service Worker 可能需要时间激活（在 GitHub Pages 上可能需要更长时间）
-    const isCrossOriginIsolated = await waitForCrossOriginIsolated(10000);
+    console.log("Waiting for crossOriginIsolated environment...");
+    const isCrossOriginIsolated = await waitForCrossOriginIsolated(15000);
     
-    // 检查 OPFS 必需的环境
+    // 严格检查：应用必须使用 OPFS，环境不满足就报错
     if (typeof SharedArrayBuffer === 'undefined') {
       throw new Error("SharedArrayBuffer not available. OPFS requires COOP/COEP headers. Please refresh the page to allow Service Worker to activate.");
     }
 
     if (typeof window !== 'undefined' && !window.crossOriginIsolated) {
-      throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Service Worker may need more time. Please refresh the page.");
+      throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Service Worker may need more time. Please refresh the page - the app will reload automatically when Service Worker is ready.");
     }
 
+    console.log("Environment ready, initializing SQLite WASM...");
     // 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
+    // 注意：SQLite WASM 在初始化时会检查环境，如果此时环境不对，OpfsDb 就不会被注册
     sqlite3 = await initSqlite3();
     console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
-    // 应用必须使用 OPFS，检查支持情况
+    // 再次确认环境状态（确保在 SQLite WASM 初始化后仍然有效）
     const opfsSupported = isOpfsSupported();
     
     if (!opfsSupported) {
@@ -83,13 +86,14 @@ export const initSQLite = async () => {
     }
 
     // 检查 OpfsDb 是否可用（这取决于 SQLite WASM 初始化时的环境状态）
+    // 如果 OpfsDb 不可用，说明 SQLite WASM 初始化时环境还没准备好
     if (!('oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1)) {
-      // 如果 OpfsDb 不可用，可能是初始化时环境还没准备好
-      // 提示用户刷新页面让 Service Worker 生效
-      throw new Error("OpfsDb is not available in SQLite WASM. This usually means the Service Worker hasn't activated yet. Please refresh the page - the app will reload automatically when Service Worker is ready.");
+      console.error("OpfsDb not available in SQLite WASM. This means the environment was not ready when SQLite WASM initialized.");
+      throw new Error("OpfsDb is not available in SQLite WASM. The Service Worker may not have activated in time. Please refresh the page - the app will reload automatically when Service Worker is ready.");
     }
 
-    // 创建 OPFS 数据库（这是唯一允许的方式）
+    console.log("Creating OPFS database...");
+    // 创建 OPFS 数据库（这是唯一允许的方式，必须使用 OPFS）
     db = new sqlite3.oo1.OpfsDb('/gitdb_data.db');
     console.log("Storage: OPFS persistence active");
     
