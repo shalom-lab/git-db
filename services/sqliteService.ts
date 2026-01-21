@@ -1,8 +1,39 @@
 
-import initSqlite3 from '@sqlite.org/sqlite-wasm';
-
+// 使用动态导入，确保在环境准备好后再加载 SQLite WASM
 let sqlite3: any = null;
 let db: any = null;
+let sqlite3Module: any = null;
+
+/**
+ * 等待 Service Worker 完全准备好
+ */
+const waitForServiceWorkerReady = async (maxWait = 10000): Promise<boolean> => {
+  if (!('serviceWorker' in navigator)) {
+    return false;
+  }
+
+  try {
+    // 等待 Service Worker 注册完成
+    const registration = await navigator.serviceWorker.ready;
+    console.log("Service Worker ready:", registration.active?.state);
+    
+    // 如果 Service Worker 已激活，等待一小段时间确保它完全控制页面
+    if (registration.active && registration.active.state === 'activated') {
+      // 等待 controller 可用（如果支持）
+      if (navigator.serviceWorker.controller) {
+        console.log("Service Worker controller is available");
+        return true;
+      }
+      // 即使没有 controller，如果已激活也应该可以
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn("Service Worker ready check failed:", err);
+    return false;
+  }
+};
 
 /**
  * 等待 crossOriginIsolated 环境准备就绪
@@ -12,11 +43,6 @@ let db: any = null;
 const waitForCrossOriginIsolated = async (maxWait = 15000): Promise<boolean> => {
   // 如果已经准备好了，直接返回
   if (typeof window !== 'undefined' && window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined') {
-    // 确保 Service Worker 已注册并可能控制页面（如果支持）
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      return true;
-    }
-    // 即使没有 controller，如果 crossOriginIsolated 为 true，也应该可以
     return true;
   }
 
@@ -48,9 +74,12 @@ export const initSQLite = async () => {
   if (db) return db;
 
   try {
-    // 等待 crossOriginIsolated 环境准备就绪（最多等待15秒）
-    // Service Worker 可能需要时间激活（在 GitHub Pages 上可能需要更长时间）
-    console.log("Waiting for crossOriginIsolated environment...");
+    // 步骤1: 等待 Service Worker 完全准备好
+    console.log("Step 1: Waiting for Service Worker to be ready...");
+    await waitForServiceWorkerReady(10000);
+    
+    // 步骤2: 等待 crossOriginIsolated 环境准备就绪（最多等待15秒）
+    console.log("Step 2: Waiting for crossOriginIsolated environment...");
     const isCrossOriginIsolated = await waitForCrossOriginIsolated(15000);
     
     // 严格检查：应用必须使用 OPFS，环境不满足就报错
@@ -62,14 +91,27 @@ export const initSQLite = async () => {
       throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Service Worker may need more time. Please refresh the page - the app will reload automatically when Service Worker is ready.");
     }
 
-    console.log("Environment ready, initializing SQLite WASM...");
-    // 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
-    // 注意：SQLite WASM 在初始化时会检查环境，如果此时环境不对，OpfsDb 就不会被注册
-    sqlite3 = await initSqlite3();
+    console.log("Step 3: Environment ready, dynamically loading SQLite WASM...");
+    // 步骤3: 动态导入 SQLite WASM（确保在环境准备好后再加载）
+    // 这样可以避免模块加载时环境还没准备好的问题
+    if (!sqlite3Module) {
+      sqlite3Module = await import('@sqlite.org/sqlite-wasm');
+    }
+    
+    // 步骤4: 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
+    console.log("Step 4: Initializing SQLite WASM...");
+    sqlite3 = await sqlite3Module.default();
     console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
     // 再次确认环境状态（确保在 SQLite WASM 初始化后仍然有效）
     const opfsSupported = isOpfsSupported();
+    console.log("Environment check after SQLite init:", {
+      crossOriginIsolated: typeof window !== 'undefined' ? window.crossOriginIsolated : 'N/A',
+      hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+      hasStorage: 'storage' in navigator,
+      hasGetDirectory: 'storage' in navigator && 'getDirectory' in navigator.storage,
+      opfsSupported
+    });
     
     if (!opfsSupported) {
       const reasons: string[] = [];
@@ -85,11 +127,33 @@ export const initSQLite = async () => {
       throw new Error(`OPFS is required but not available: ${reasons.join(', ')}. Please refresh the page to allow Service Worker to activate.`);
     }
 
-    // 检查 OpfsDb 是否可用（这取决于 SQLite WASM 初始化时的环境状态）
-    // 如果 OpfsDb 不可用，说明 SQLite WASM 初始化时环境还没准备好
-    if (!('oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1)) {
-      console.error("OpfsDb not available in SQLite WASM. This means the environment was not ready when SQLite WASM initialized.");
-      throw new Error("OpfsDb is not available in SQLite WASM. The Service Worker may not have activated in time. Please refresh the page - the app will reload automatically when Service Worker is ready.");
+    // 检查 OpfsDb 是否可用
+    // 根据 SQLite WASM 文档，OpfsDb 应该可用，即使 OPFS VFS 在主线程安装失败
+    // 因为 OpfsDb 会自动在 Worker 中处理
+    console.log("Step 5: Checking for OpfsDb availability...");
+    console.log("SQLite3 object structure:", {
+      hasOo1: 'oo1' in sqlite3,
+      hasCapi: 'capi' in sqlite3,
+      oo1Keys: 'oo1' in sqlite3 ? Object.keys(sqlite3.oo1) : [],
+      hasOpfsDb: 'oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1,
+      hasOpfsVfs: 'capi' in sqlite3 && sqlite3.capi.sqlite3_vfs_find ? sqlite3.capi.sqlite3_vfs_find('opfs') !== null : 'N/A'
+    });
+
+    if (!('oo1' in sqlite3)) {
+      throw new Error("SQLite WASM oo1 API not available. This is unexpected.");
+    }
+
+    if (!('OpfsDb' in sqlite3.oo1)) {
+      // 根据文档，OpfsDb 应该可用。如果不可用，可能是版本问题或环境问题
+      console.error("OpfsDb not available in sqlite3.oo1. Available classes:", Object.keys(sqlite3.oo1));
+      
+      // 检查是否有 OPFS VFS
+      if ('capi' in sqlite3 && sqlite3.capi.sqlite3_vfs_find) {
+        const opfsVfs = sqlite3.capi.sqlite3_vfs_find('opfs');
+        console.log("OPFS VFS status:", opfsVfs ? "Found" : "Not found");
+      }
+      
+      throw new Error("OpfsDb is not available in SQLite WASM. This application requires OPFS support. Please ensure you are using a compatible browser and that COOP/COEP headers are properly set.");
     }
 
     console.log("Creating OPFS database...");
