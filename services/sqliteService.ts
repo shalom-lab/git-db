@@ -7,8 +7,9 @@ let db: any = null;
 /**
  * 等待 crossOriginIsolated 环境准备就绪
  * Service Worker 可能需要一些时间才能激活并设置正确的 COOP/COEP 头
+ * 在 GitHub Pages 上，Service Worker 需要时间接管页面
  */
-const waitForCrossOriginIsolated = async (maxWait = 3000): Promise<boolean> => {
+const waitForCrossOriginIsolated = async (maxWait = 10000): Promise<boolean> => {
   // 如果已经准备好了，直接返回
   if (typeof window !== 'undefined' && window.crossOriginIsolated) {
     return true;
@@ -19,13 +20,19 @@ const waitForCrossOriginIsolated = async (maxWait = 3000): Promise<boolean> => {
     const checkInterval = setInterval(() => {
       if (typeof window !== 'undefined' && window.crossOriginIsolated) {
         clearInterval(checkInterval);
-        resolve(true);
+        // 确保 SharedArrayBuffer 也可用
+        if (typeof SharedArrayBuffer !== 'undefined') {
+          resolve(true);
+        } else {
+          console.warn("crossOriginIsolated is true but SharedArrayBuffer is not available");
+          resolve(false);
+        }
       } else if (Date.now() - startTime > maxWait) {
         clearInterval(checkInterval);
-        console.warn(`crossOriginIsolated not available after ${maxWait}ms`);
+        console.warn(`crossOriginIsolated not available after ${maxWait}ms. Service Worker may need more time to activate.`);
         resolve(false);
       }
-    }, 100);
+    }, 50); // 更频繁的检查
   });
 };
 
@@ -42,19 +49,19 @@ export const initSQLite = async () => {
 
   try {
     // 等待 crossOriginIsolated 环境准备就绪
-    // Service Worker 可能需要时间激活
-    const isCrossOriginIsolated = await waitForCrossOriginIsolated();
+    // Service Worker 可能需要时间激活（在 GitHub Pages 上可能需要更长时间）
+    const isCrossOriginIsolated = await waitForCrossOriginIsolated(10000);
     
     // 检查 OPFS 必需的环境
     if (typeof SharedArrayBuffer === 'undefined') {
-      throw new Error("SharedArrayBuffer not available. OPFS requires COOP/COEP headers. Please ensure Service Worker is active.");
+      throw new Error("SharedArrayBuffer not available. OPFS requires COOP/COEP headers. Please refresh the page to allow Service Worker to activate.");
     }
 
     if (typeof window !== 'undefined' && !window.crossOriginIsolated) {
-      throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Please ensure Service Worker is active.");
+      throw new Error("crossOriginIsolated is false. OPFS requires COOP/COEP headers. Service Worker may need more time. Please refresh the page.");
     }
 
-    // 初始化 SQLite WASM
+    // 初始化 SQLite WASM（必须在 crossOriginIsolated 为 true 时初始化，否则 OpfsDb 可能不可用）
     sqlite3 = await initSqlite3();
     console.log("SQLite3 loaded version:", sqlite3.version.libVersion);
 
@@ -72,11 +79,14 @@ export const initSQLite = async () => {
       if (!('storage' in navigator && 'getDirectory' in navigator.storage)) {
         reasons.push("OPFS API not available");
       }
-      throw new Error(`OPFS is required but not available: ${reasons.join(', ')}. Please ensure your browser supports OPFS and COOP/COEP headers are set.`);
+      throw new Error(`OPFS is required but not available: ${reasons.join(', ')}. Please refresh the page to allow Service Worker to activate.`);
     }
 
+    // 检查 OpfsDb 是否可用（这取决于 SQLite WASM 初始化时的环境状态）
     if (!('oo1' in sqlite3 && 'OpfsDb' in sqlite3.oo1)) {
-      throw new Error("OpfsDb is not available in SQLite WASM. This application requires OPFS support.");
+      // 如果 OpfsDb 不可用，可能是初始化时环境还没准备好
+      // 提示用户刷新页面让 Service Worker 生效
+      throw new Error("OpfsDb is not available in SQLite WASM. This usually means the Service Worker hasn't activated yet. Please refresh the page - the app will reload automatically when Service Worker is ready.");
     }
 
     // 创建 OPFS 数据库（这是唯一允许的方式）
