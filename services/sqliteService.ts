@@ -212,11 +212,23 @@ export const executeQuery = async (sql: string, params: any[] = []) => {
       rowMode: 'object'
     });
     
-    if (response.result.code !== 0) {
-      throw new Error(response.result.message || 'Query execution failed');
+    // 🛑 修复：检查是否出错，而不是检查 code !== 0
+    // 在 sqlite3Worker1Promiser API 中：
+    // - 成功时：type 不是 'error'，result 包含查询结果
+    // - 失败时：type 是 'error'，result 包含错误信息
+    if (response.type === 'error') {
+      const errorMsg = response.result?.message || 'Query execution failed';
+      console.error("Query execution error:", {
+        sql,
+        type: response.type,
+        message: errorMsg,
+        fullResponse: response
+      });
+      throw new Error(errorMsg);
     }
     
-    return response.result.resultRows || [];
+    // 返回查询结果（resultRows 可能为空数组，这是正常的）
+    return response.result?.resultRows || [];
   } catch (err) {
     console.error("Query Error:", sql, err);
     throw err;
