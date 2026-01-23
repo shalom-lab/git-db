@@ -112,13 +112,6 @@ For security, follow these recommendations:
 | **Build Tool** | Vite |
 | **Middleware** | [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) |
 
-### 🎨 Branding
-
-- **Logo**: Available in `public/images/logo.svg` (SVG format, blue theme `#387be5`)
-- **Favicon**: Available in `public/images/favicon.svg` (32x32 optimized for browser tabs)
-- **Usage**: The logo is used in README and can be customized by editing the SVG files
-
----
 
 ## 📋 Supported Data Types
 

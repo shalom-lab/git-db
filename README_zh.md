@@ -112,13 +112,6 @@
 | **构建工具** | Vite |
 | **中间件** | [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) |
 
-### 🎨 品牌标识
-
-- **Logo**: 位于 `public/images/logo.svg`（SVG 格式，蓝色主题 `#387be5`）
-- **Favicon**: 位于 `public/images/favicon.svg`（32x32 优化，用于浏览器标签页）
-- **使用**: Logo 在 README 中使用，可通过编辑 SVG 文件自定义
-
----
 
 ## 📋 支持的数据类型
 

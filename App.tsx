@@ -284,6 +284,22 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 shrink-0 shadow-sm z-10">
           <div className="flex items-center space-x-4 min-w-0">
+            <div className="flex items-center space-x-2 mr-4">
+              <img 
+                src="/images/logo.svg" 
+                alt="GitDB Logo" 
+                className="w-6 h-6"
+              />
+              <a 
+                href="https://github.com/shalom-lab/git-db" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-lg font-bold tracking-tighter hover:underline transition-all text-gray-800 dark:text-gray-100"
+              >
+                GitDB
+              </a>
+            </div>
+            <div className="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
             <h2 className="text-lg font-black truncate tracking-tighter text-gray-800 dark:text-gray-100 uppercase">
               {state.currentView === 'tables' ? (state.currentTable || t.nav.browser) : state.currentView === 'sql' ? t.nav.sql : t.nav.settings}
             </h2>
