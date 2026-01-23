@@ -107,8 +107,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
           <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-700 to-transparent mb-4"></div>
           
           <div className="flex items-center space-x-2 text-primary">
-            {ICONS.Branch}
-            <span className="text-sm font-black tracking-widest uppercase">GitDB Open Source</span>
+            <img 
+              src={`${import.meta.env.BASE_URL}images/logo.svg`}
+              alt="GitDB Logo" 
+              className="w-5 h-5"
+            />
+            <a 
+              href="https://github.com/shalom-lab/git-db" 
+              target="_blank" 
+              rel="noreferrer"
+              className="text-sm font-black tracking-widest uppercase hover:underline transition-all"
+            >
+              GitDB Open Source
+            </a>
           </div>
           
           <p className="text-[12px] text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
