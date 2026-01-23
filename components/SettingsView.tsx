@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 import { GithubConfig, Language } from '../types';
 import { I18N, ICONS, DEFAULT_DB_PATH } from '../constants';
+import { GitHubService, ValidationResult } from '../services/githubService';
 
 interface SettingsViewProps {
   config: GithubConfig | null;
@@ -16,17 +17,101 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
     repo: '',
     path: DEFAULT_DB_PATH
   });
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const t = I18N[lang];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localConfig.token.trim() && localConfig.repo.trim()) {
-      onUpdate({
-        ...localConfig,
+    
+    if (!localConfig.token.trim() || !localConfig.repo.trim()) {
+      return;
+    }
+
+    // 开始验证
+    setIsValidating(true);
+    setValidationResult(null);
+
+    try {
+      const result = await GitHubService.validateConfig({
         token: localConfig.token.trim(),
         repo: localConfig.repo.trim(),
         path: localConfig.path.trim() || DEFAULT_DB_PATH
       });
+
+      // 根据语言本地化错误消息
+      if (!result.valid && lang === Language.ZH) {
+        const zhMessages: { [key: string]: string } = {
+          'Invalid token. Please check your GitHub token.': 'Token 无效，请检查您的 GitHub token。',
+          'Invalid repository format. Expected: owner/repo': '仓库格式无效，应为：owner/repo',
+          'not found or you don\'t have access to it.': '未找到或您没有访问权限。',
+          'Access denied to repository': '访问仓库被拒绝',
+          'Token does not have "Contents: Read" permission': 'Token 没有 "Contents: Read" 权限',
+          'Token does not have "Contents: Write" permission': 'Token 没有 "Contents: Write" 权限',
+          'Validation failed unexpectedly': '验证意外失败',
+          'Configuration validated successfully!': '配置验证成功！'
+        };
+        
+        // 尝试匹配并替换消息
+        for (const [en, zh] of Object.entries(zhMessages)) {
+          if (result.message.includes(en) || result.message === en) {
+            result.message = result.message.replace(en, zh);
+            break;
+          }
+        }
+        
+        // 特殊处理包含仓库名的消息
+        if (result.message.includes('Repository "') && result.message.includes('" not found')) {
+          const repoMatch = result.message.match(/Repository "([^"]+)"/);
+          if (repoMatch) {
+            result.message = `仓库 "${repoMatch[1]}" 未找到或您没有访问权限。`;
+          }
+        } else if (result.message.includes('Access denied to repository "')) {
+          const repoMatch = result.message.match(/repository "([^"]+)"/);
+          if (repoMatch) {
+            result.message = `访问仓库 "${repoMatch[1]}" 被拒绝，请检查您的 token 权限。`;
+          }
+        } else if (result.message.includes('Token does not have "Contents: Read" permission for repository "')) {
+          const repoMatch = result.message.match(/repository "([^"]+)"/);
+          if (repoMatch) {
+            result.message = `Token 对仓库 "${repoMatch[1]}" 没有 "Contents: Read" 权限。`;
+          }
+        } else if (result.message.includes('Token does not have "Contents: Write" permission for repository "')) {
+          const repoMatch = result.message.match(/repository "([^"]+)"/);
+          if (repoMatch) {
+            result.message = `Token 对仓库 "${repoMatch[1]}" 没有 "Contents: Write" 权限。请授予 "Contents: Read and Write" 权限。`;
+          }
+        }
+      }
+
+      setValidationResult(result);
+
+      if (result.valid) {
+        // 验证通过，保存配置
+        onUpdate({
+          ...localConfig,
+          token: localConfig.token.trim(),
+          repo: localConfig.repo.trim(),
+          path: localConfig.path.trim() || DEFAULT_DB_PATH
+        });
+      }
+    } catch (error: any) {
+      const errorMsg = lang === Language.ZH 
+        ? '验证意外失败，请检查网络连接和配置。'
+        : error.message || 'Validation failed unexpectedly';
+      
+      setValidationResult({
+        valid: false,
+        message: errorMsg,
+        details: {
+          tokenValid: false,
+          repoAccessible: false,
+          hasReadPermission: false,
+          hasWritePermission: false
+        }
+      });
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -83,6 +168,46 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
             </div>
           </div>
 
+          {/* 验证结果提示 */}
+          {validationResult && (
+            <div className={`p-4 rounded-xl border ${
+              validationResult.valid 
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <span className={validationResult.valid ? 'text-green-500' : 'text-red-500'}>
+                  {validationResult.valid ? ICONS.Check : ICONS.Error}
+                </span>
+                <div className="flex-1">
+                  <p className={`text-sm font-bold ${
+                    validationResult.valid 
+                      ? 'text-green-700 dark:text-green-400' 
+                      : 'text-red-700 dark:text-red-400'
+                  }`}>
+                    {validationResult.message}
+                  </p>
+                  {validationResult.details && !validationResult.valid && (
+                    <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                      {!validationResult.details.tokenValid && (
+                        <p>• {lang === Language.EN ? 'Token is invalid or expired' : 'Token 无效或已过期'}</p>
+                      )}
+                      {validationResult.details.tokenValid && !validationResult.details.repoAccessible && (
+                        <p>• {lang === Language.EN ? 'Repository not found or inaccessible' : '仓库未找到或无法访问'}</p>
+                      )}
+                      {validationResult.details.repoAccessible && !validationResult.details.hasReadPermission && (
+                        <p>• {lang === Language.EN ? 'Missing "Contents: Read" permission' : '缺少 "Contents: Read" 权限'}</p>
+                      )}
+                      {validationResult.details.hasReadPermission && !validationResult.details.hasWritePermission && (
+                        <p>• {lang === Language.EN ? 'Missing "Contents: Write" permission' : '缺少 "Contents: Write" 权限'}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between items-center pt-4 border-t border-gray-50 dark:border-gray-700">
             <a 
               href="https://github.com/settings/personal-access-tokens/new" 
@@ -94,9 +219,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, lang, onUpdate }) =
             </a>
             <button
               type="submit"
-              className="bg-primary hover:bg-primary/90 text-white px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all active:scale-95"
+              disabled={isValidating}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all active:scale-95 flex items-center space-x-2"
             >
-              {t.settings.save_btn}
+              {isValidating ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  <span>{lang === Language.EN ? 'Validating...' : '验证中...'}</span>
+                </>
+              ) : (
+                <span>{t.settings.save_btn}</span>
+              )}
             </button>
           </div>
         </form>
