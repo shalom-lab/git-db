@@ -29,10 +29,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand Header */}
       <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-center space-x-2 text-primary font-bold">
-          <div className="p-1.5 bg-primary/10 rounded-lg">
-            {ICONS.Branch}
-          </div>
-          <span className="tracking-tight text-xl font-extrabold">GitDB</span>
+          <img 
+            src="/images/logo.svg" 
+            alt="GitDB Logo" 
+            className="w-6 h-6"
+          />
+          <a 
+            href="https://github.com/shalom-lab/git-db" 
+            target="_blank" 
+            rel="noreferrer"
+            className="tracking-tight text-xl font-extrabold hover:underline transition-all"
+          >
+            GitDB
+          </a>
         </div>
       </div>
       
