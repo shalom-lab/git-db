@@ -32,8 +32,19 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ onSave, lang }) => {
           <div className="flex justify-center mb-6">
             <div className="p-4 bg-primary/10 rounded-full text-primary border border-primary/20 shadow-inner">
               <div className="flex items-center space-x-2">
-                {ICONS.Branch}
-                <span className="text-2xl font-bold tracking-tighter">GitDB</span>
+                <img 
+                  src="/images/logo.svg" 
+                  alt="GitDB Logo" 
+                  className="w-6 h-6"
+                />
+                <a 
+                  href="https://github.com/shalom-lab/git-db" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-2xl font-bold tracking-tighter hover:underline transition-all"
+                >
+                  GitDB
+                </a>
               </div>
             </div>
           </div>
