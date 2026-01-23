@@ -1,5 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
+import Editor from 'react-simple-code-editor';
+import { highlight, languages } from 'prismjs';
+import 'prismjs/components/prism-sql';
+import 'prismjs/themes/prism.css';
 import { executeQuery } from '../services/sqliteService';
 import { Language } from '../types';
 import { I18N, ICONS } from '../constants';
@@ -14,59 +18,10 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [execTime, setExecTime] = useState<number | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const preRef = useRef<HTMLPreElement>(null);
   const t = I18N[lang];
 
-  const handleScroll = () => {
-    if (textareaRef.current && preRef.current) {
-      preRef.current.scrollTop = textareaRef.current.scrollTop;
-      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
-    }
-  };
-
-  // 同步光标位置和滚动
-  const syncScrollAndCursor = () => {
-    if (textareaRef.current && preRef.current) {
-      preRef.current.scrollTop = textareaRef.current.scrollTop;
-      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
-    }
-  };
-
-  const highlightSQL = (code: string) => {
-    if (!code) return '';
-    
-    // 1. Essential keywords for SQLite
-    const keywords = [
-      'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'UPDATE', 'SET', 'DELETE', 
-      'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'JOIN', 'LEFT', 
-      'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER', 'LIMIT', 
-      'OFFSET', 'HAVING', 'AND', 'OR', 'IN', 'IS', 'NOT', 'NULL', 'VALUES', 
-      'DISTINCT', 'AS', 'UNION', 'ALL', 'CASE', 'WHEN', 'THEN', 'ELSE', 
-      'END', 'PRAGMA', 'INTEGER', 'PRIMARY', 'KEY', 'AUTOINCREMENT', 'TEXT',
-      'VARCHAR', 'UNIQUE', 'DEFAULT', 'TIMESTAMP', 'CURRENT_TIMESTAMP'
-    ];
-
-    // 2. Tokenize using regex groups to avoid double replacement
-    // Group 1: Comments, Group 2: Strings, Group 3: Keywords, Group 4: Numbers
-    const tokenRegex = new RegExp(
-      `(--.*$|\\/\\*[\\s\\S]*?\\*\\/)|` +          // Group 1: Comments
-      `('[^']*'|"[^"]*")|` +                       // Group 2: Strings
-      `\\b(${keywords.join('|')})\\b|` +           // Group 3: Keywords
-      `(\\b\\d+\\b)`,                              // Group 4: Numbers
-      'gi'
-    );
-
-    // Escape HTML first to prevent injection and then wrap tokens
-    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    return escaped.replace(tokenRegex, (match, comment, str, kw, num) => {
-      if (comment) return `<span class="text-gray-400 italic">${match}</span>`;
-      if (str) return `<span class="text-green-500">${match}</span>`;
-      if (kw) return `<span class="text-blue-500 dark:text-blue-400 font-bold">${match.toUpperCase()}</span>`;
-      if (num) return `<span class="text-amber-500">${match}</span>`;
-      return match;
-    }) + '\n';
+  const highlightCode = (code: string) => {
+    return highlight(code, languages.sql, 'sql');
   };
 
   const handleRun = async () => {
@@ -89,49 +44,6 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      handleRun();
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = textareaRef.current?.selectionStart || 0;
-      const end = textareaRef.current?.selectionEnd || 0;
-      const val = query.substring(0, start) + '  ' + query.substring(end);
-      setQuery(val);
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
-        }
-      }, 0);
-    }
-  };
-
-  useEffect(() => { 
-    syncScrollAndCursor();
-  }, [query]);
-
-  // 监听输入事件，实时同步滚动
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const handleInput = () => {
-        syncScrollAndCursor();
-      };
-      const handleSelectionChange = () => {
-        syncScrollAndCursor();
-      };
-      textarea.addEventListener('input', handleInput);
-      textarea.addEventListener('scroll', handleScroll);
-      textarea.addEventListener('select', handleSelectionChange);
-      return () => {
-        textarea.removeEventListener('input', handleInput);
-        textarea.removeEventListener('scroll', handleScroll);
-        textarea.removeEventListener('select', handleSelectionChange);
-      };
-    }
-  }, []);
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-in fade-in duration-300">
@@ -155,33 +67,99 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
         
         {/* SQL Editor Container */}
         <div className="relative flex-1 w-full group overflow-hidden bg-white dark:bg-gray-800">
-          {/* Highlighting Layer (Backdrop) */}
-          <pre
-            ref={preRef}
-            aria-hidden="true"
-            className="absolute inset-0 p-6 mono text-[14px] leading-[1.7] whitespace-pre-wrap break-all pointer-events-none overflow-auto custom-scrollbar transition-colors select-none z-10 border-none"
-            dangerouslySetInnerHTML={{ __html: highlightSQL(query) }}
-            style={{ margin: 0, fontFeatureSettings: '"liga" 0' }}
-          />
-          {/* Input Layer (Front) */}
-          <textarea
-            ref={textareaRef}
-            className="absolute inset-0 w-full h-full p-6 mono text-[14px] leading-[1.7] bg-transparent outline-none resize-none text-transparent caret-gray-900 dark:caret-white whitespace-pre-wrap break-all overflow-auto custom-scrollbar transition-colors z-20 border-none focus:ring-0"
-            placeholder={`-- Write your SQL here...\nCREATE TABLE demo (id INTEGER PRIMARY KEY);`}
+          <Editor
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              // 立即同步滚动
-              requestAnimationFrame(() => {
-                syncScrollAndCursor();
-              });
+            onValueChange={setQuery}
+            highlight={highlightCode}
+            padding={24}
+            placeholder="-- Write your SQL here...&#10;CREATE TABLE demo (id INTEGER PRIMARY KEY);"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleRun();
+              }
+              if (e.key === 'Tab') {
+                e.preventDefault();
+                const target = e.target as HTMLTextAreaElement;
+                const start = target.selectionStart || 0;
+                const end = target.selectionEnd || 0;
+                const newValue = query.substring(0, start) + '  ' + query.substring(end);
+                setQuery(newValue);
+                setTimeout(() => {
+                  target.selectionStart = target.selectionEnd = start + 2;
+                }, 0);
+              }
             }}
-            onKeyDown={handleKeyDown}
-            onScroll={handleScroll}
-            onSelect={syncScrollAndCursor}
-            spellCheck={false}
-            style={{ fontFeatureSettings: '"liga" 0' }}
+            style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+              fontSize: 14,
+              lineHeight: 1.7,
+              outline: 'none',
+              border: 'none',
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'transparent',
+              color: 'inherit',
+              overflow: 'auto',
+            }}
+            textareaClassName="mono text-[14px] leading-[1.7] outline-none resize-none whitespace-pre-wrap break-all custom-scrollbar transition-colors focus:ring-0 caret-gray-900 dark:caret-white"
+            preClassName="mono text-[14px] leading-[1.7] whitespace-pre-wrap break-all custom-scrollbar"
           />
+          <style>{`
+            /* Prism.js 暗色模式样式覆盖 */
+            .dark pre code,
+            .dark code[class*="language-"],
+            .dark pre[class*="language-"] {
+              color: #e2e8f0;
+            }
+            .dark .token.comment,
+            .dark .token.prolog,
+            .dark .token.doctype,
+            .dark .token.cdata {
+              color: #94a3b8;
+            }
+            .dark .token.punctuation {
+              color: #cbd5e1;
+            }
+            .dark .token.property,
+            .dark .token.tag,
+            .dark .token.boolean,
+            .dark .token.number,
+            .dark .token.constant,
+            .dark .token.symbol,
+            .dark .token.deleted {
+              color: #fbbf24;
+            }
+            .dark .token.selector,
+            .dark .token.attr-name,
+            .dark .token.string,
+            .dark .token.char,
+            .dark .token.builtin,
+            .dark .token.inserted {
+              color: #10b981;
+            }
+            .dark .token.operator,
+            .dark .token.entity,
+            .dark .token.url,
+            .dark .language-css .token.string,
+            .dark .style .token.string {
+              color: #60a5fa;
+            }
+            .dark .token.atrule,
+            .dark .token.attr-value,
+            .dark .token.keyword {
+              color: #60a5fa;
+            }
+            .dark .token.function,
+            .dark .token.class-name {
+              color: #a78bfa;
+            }
+            .dark .token.regex,
+            .dark .token.important,
+            .dark .token.variable {
+              color: #f59e0b;
+            }
+          `}</style>
           <div className="absolute bottom-3 right-5 text-[8px] text-gray-300 dark:text-gray-600 font-black uppercase tracking-widest pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity">
             Ctrl + Enter to execute
           </div>
