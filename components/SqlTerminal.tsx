@@ -1,9 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import Editor from 'react-simple-code-editor';
-import { highlight, languages } from 'prismjs';
-import 'prismjs/components/prism-sql';
-import 'prismjs/themes/prism.css';
-import 'prismjs/themes/prism-tomorrow.css';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { executeQuery } from '../services/sqliteService';
 import { Language } from '../types';
 import { I18N, ICONS } from '../constants';
@@ -18,27 +14,62 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [execTime, setExecTime] = useState<number | null>(null);
-  const [isDark, setIsDark] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
   const t = I18N[lang];
 
-  // 检测当前主题
-  useEffect(() => {
-    const checkTheme = () => {
-      const root = document.documentElement;
-      setIsDark(root.classList.contains('dark'));
-    };
+  const handleScroll = () => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
 
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
+  // 同步光标位置和滚动
+  const syncScrollAndCursor = () => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
 
-    return () => observer.disconnect();
-  }, []);
+  const highlightSQL = (code: string) => {
+    if (!code) return '';
+    
+    // 1. Essential keywords for SQLite
+    const keywords = [
+      'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'UPDATE', 'SET', 'DELETE', 
+      'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'JOIN', 'LEFT', 
+      'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER', 'LIMIT', 
+      'OFFSET', 'HAVING', 'AND', 'OR', 'IN', 'IS', 'NOT', 'NULL', 'VALUES', 
+      'DISTINCT', 'AS', 'UNION', 'ALL', 'CASE', 'WHEN', 'THEN', 'ELSE', 
+      'END', 'PRAGMA', 'INTEGER', 'PRIMARY', 'KEY', 'AUTOINCREMENT', 'TEXT',
+      'VARCHAR', 'UNIQUE', 'DEFAULT', 'TIMESTAMP', 'CURRENT_TIMESTAMP'
+    ];
 
-  const handleRun = useCallback(async () => {
+    // 2. Tokenize using regex groups to avoid double replacement
+    // Group 1: Comments, Group 2: Strings, Group 3: Keywords, Group 4: Numbers
+    const tokenRegex = new RegExp(
+      `(--.*$|\\/\\*[\\s\\S]*?\\*\\/)|` +          // Group 1: Comments
+      `('[^']*'|"[^"]*")|` +                       // Group 2: Strings
+      `\\b(${keywords.join('|')})\\b|` +           // Group 3: Keywords
+      `(\\b\\d+\\b)`,                              // Group 4: Numbers
+      'gi'
+    );
+
+    // Escape HTML first to prevent injection and then wrap tokens
+    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    return escaped.replace(tokenRegex, (match, comment, str, kw, num) => {
+      if (comment) return `<span class="text-gray-400 italic">${match}</span>`;
+      if (str) return `<span class="text-green-500">${match}</span>`;
+      if (kw) return `<span class="text-blue-500 dark:text-blue-400 font-bold">${match.toUpperCase()}</span>`;
+      if (num) return `<span class="text-amber-500">${match}</span>`;
+      return match;
+    }) + '\n';
+  };
+
+  const handleRun = async () => {
     if (!query.trim()) return;
     setError(null);
     setResults([]);
@@ -56,11 +87,51 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
       setResults([]);
       setExecTime(null);
     }
-  }, [query, onMutation]);
-
-  const highlightCode = (code: string) => {
-    return highlight(code, languages.sql, 'sql');
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleRun();
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = textareaRef.current?.selectionStart || 0;
+      const end = textareaRef.current?.selectionEnd || 0;
+      const val = query.substring(0, start) + '  ' + query.substring(end);
+      setQuery(val);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+        }
+      }, 0);
+    }
+  };
+
+  useEffect(() => { 
+    syncScrollAndCursor();
+  }, [query]);
+
+  // 监听输入事件，实时同步滚动
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const handleInput = () => {
+        syncScrollAndCursor();
+      };
+      const handleSelectionChange = () => {
+        syncScrollAndCursor();
+      };
+      textarea.addEventListener('input', handleInput);
+      textarea.addEventListener('scroll', handleScroll);
+      textarea.addEventListener('select', handleSelectionChange);
+      return () => {
+        textarea.removeEventListener('input', handleInput);
+        textarea.removeEventListener('scroll', handleScroll);
+        textarea.removeEventListener('select', handleSelectionChange);
+      };
+    }
+  }, []);
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-in fade-in duration-300">
@@ -82,35 +153,38 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
           </button>
         </div>
         
-        {/* Lightweight Code Editor */}
-        <div className="flex-1 overflow-auto">
-          <Editor
-            value={query}
-            onValueChange={setQuery}
-            highlight={highlightCode}
-            padding={24}
-            style={{
-              fontFamily: '"JetBrains Mono", monospace',
-              fontSize: '13px',
-              lineHeight: '1.6',
-              outline: 'none',
-              minHeight: '100%',
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              color: isDark ? '#e2e8f0' : '#1e293b',
-            }}
-            textareaClassName="editor-textarea"
-            preClassName={isDark ? 'prism-tomorrow' : 'prism'}
-            placeholder="-- Write your SQL here...&#10;CREATE TABLE demo (id INTEGER PRIMARY KEY);"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                handleRun();
-              }
-            }}
+        {/* SQL Editor Container */}
+        <div className="relative flex-1 w-full group overflow-hidden bg-white dark:bg-gray-800">
+          {/* Highlighting Layer (Backdrop) */}
+          <pre
+            ref={preRef}
+            aria-hidden="true"
+            className="absolute inset-0 p-6 mono text-[14px] leading-[1.7] whitespace-pre-wrap break-all pointer-events-none overflow-auto custom-scrollbar transition-colors select-none z-10 border-none"
+            dangerouslySetInnerHTML={{ __html: highlightSQL(query) }}
+            style={{ margin: 0, fontFeatureSettings: '"liga" 0' }}
           />
-        </div>
-        <div className="absolute bottom-3 right-5 text-[8px] text-gray-300 dark:text-gray-600 font-black uppercase tracking-widest pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity">
-          Ctrl + Enter to execute
+          {/* Input Layer (Front) */}
+          <textarea
+            ref={textareaRef}
+            className="absolute inset-0 w-full h-full p-6 mono text-[14px] leading-[1.7] bg-transparent outline-none resize-none text-transparent caret-gray-900 dark:caret-white whitespace-pre-wrap break-all overflow-auto custom-scrollbar transition-colors z-20 border-none focus:ring-0"
+            placeholder={`-- Write your SQL here...\nCREATE TABLE demo (id INTEGER PRIMARY KEY);`}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // 立即同步滚动
+              requestAnimationFrame(() => {
+                syncScrollAndCursor();
+              });
+            }}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            onSelect={syncScrollAndCursor}
+            spellCheck={false}
+            style={{ fontFeatureSettings: '"liga" 0' }}
+          />
+          <div className="absolute bottom-3 right-5 text-[8px] text-gray-300 dark:text-gray-600 font-black uppercase tracking-widest pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+            Ctrl + Enter to execute
+          </div>
         </div>
       </div>
 
@@ -118,7 +192,7 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl flex items-start space-x-3 animate-in slide-in-from-top-2 z-10">
           <span className="text-red-500 mt-0.5">{ICONS.Error}</span>
           <div className="space-y-1">
-            <p className="text-[11px] text-red-700 dark:text-red-400 font-mono font-bold leading-tight">{error}</p>
+            <p className="text-[13px] text-red-700 dark:text-red-400 font-mono font-bold leading-tight">{error}</p>
           </div>
         </div>
       )}
@@ -128,19 +202,19 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
            <div className="flex items-center space-x-3">
              <div className="flex items-center space-x-1.5">
                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-               <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{results.length} Results</span>
+               <span className="text-[12px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{results.length} Results</span>
              </div>
-             {execTime && <span className="text-[9px] font-bold text-gray-300 dark:text-gray-600 mono px-2 py-0.5 bg-gray-50 dark:bg-gray-700 rounded-full">{execTime.toFixed(2)}ms</span>}
+             {execTime && <span className="text-[11px] font-bold text-gray-300 dark:text-gray-600 mono px-2 py-0.5 bg-gray-50 dark:bg-gray-700 rounded-full">{execTime.toFixed(2)}ms</span>}
            </div>
         </div>
         
         <div className="flex-1 overflow-auto custom-scrollbar">
           {results.length > 0 ? (
-            <table className="w-full text-left text-[11px] border-collapse">
+            <table className="w-full text-left text-[13px] border-collapse">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   {Object.keys(results[0]).map(key => (
-                    <th key={key} className="px-6 py-3 font-black text-gray-400 dark:text-gray-500 bg-gray-50/50 dark:bg-gray-800/80 backdrop-blur-md uppercase tracking-tighter text-[10px]">{key}</th>
+                    <th key={key} className="px-6 py-3 font-black text-gray-400 dark:text-gray-500 bg-gray-50/50 dark:bg-gray-800/80 backdrop-blur-md uppercase tracking-tighter text-[11px]">{key}</th>
                   ))}
                 </tr>
               </thead>
@@ -162,49 +236,52 @@ const SqlTerminal: React.FC<SqlTerminalProps> = ({ lang, onMutation }) => {
                   {React.cloneElement(ICONS.Terminal as React.ReactElement<any>, { size: 64, strokeWidth: 1 })}
                </div>
                <div className="text-center space-y-1">
-                 <p className="text-[11px] font-black uppercase tracking-[0.3em]">{t.empty.sql_help}</p>
-                 <p className="text-[10px] opacity-60">Result set will appear here after execution</p>
+                 <p className="text-[13px] font-black uppercase tracking-[0.3em]">{t.empty.sql_help}</p>
+                 <p className="text-[12px] opacity-60">Result set will appear here after execution</p>
                </div>
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+};
 
-      <style>{`
-        .editor-textarea {
-          outline: none !important;
-          border: none !important;
-          background: transparent !important;
-          color: transparent !important;
-          caret-color: ${isDark ? '#e2e8f0' : '#1e293b'} !important;
-          resize: none !important;
-          font-family: "JetBrains Mono", monospace !important;
-        }
-        .editor-textarea::selection {
-          background: ${isDark ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'} !important;
-        }
-        .prism, .prism-tomorrow {
-          margin: 0 !important;
-          padding: 0 !important;
-          background: transparent !important;
-        }
-        .prism code, .prism-tomorrow code {
-          font-family: "JetBrains Mono", monospace !important;
-          background: transparent !important;
-        }
-        /* 确保 Prism 主题适配 */
-        ${isDark ? `
-          .prism-tomorrow .token.keyword { color: #c792ea !important; }
-          .prism-tomorrow .token.string { color: #c3e88d !important; }
-          .prism-tomorrow .token.comment { color: #546e7a !important; }
-          .prism-tomorrow .token.number { color: #f78c6c !important; }
-        ` : `
-          .prism .token.keyword { color: #07a !important; }
-          .prism .token.string { color: #690 !important; }
-          .prism .token.comment { color: #999 !important; }
-          .prism .token.number { color: #905 !important; }
-        `}
-      `}</style>
+export default SqlTerminal;
+
+            <table className="w-full text-left text-[13px] border-collapse">
+              <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10 border-b border-gray-200 dark:border-gray-700">
+                <tr>
+                  {Object.keys(results[0]).map(key => (
+                    <th key={key} className="px-6 py-3 font-black text-gray-400 dark:text-gray-500 bg-gray-50/50 dark:bg-gray-800/80 backdrop-blur-md uppercase tracking-tighter text-[11px]">{key}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {results.map((row, i) => (
+                  <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors group">
+                    {Object.values(row).map((val: any, j) => (
+                      <td key={j} className="px-6 py-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap group-hover:text-gray-900 dark:group-hover:text-gray-100 border-r border-gray-50 dark:border-gray-700 last:border-0">
+                        {val === null ? <span className="italic opacity-30 text-gray-300">null</span> : val.toString()}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-gray-200 dark:text-gray-700 p-12 space-y-4">
+               <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-full border border-gray-100 dark:border-gray-700">
+                  {React.cloneElement(ICONS.Terminal as React.ReactElement<any>, { size: 64, strokeWidth: 1 })}
+               </div>
+               <div className="text-center space-y-1">
+                 <p className="text-[13px] font-black uppercase tracking-[0.3em]">{t.empty.sql_help}</p>
+                 <p className="text-[12px] opacity-60">Result set will appear here after execution</p>
+               </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -309,3 +309,57 @@ export const importDatabase = async (data: Uint8Array) => {
     throw new Error(`Failed to import database to OPFS: ${err.message}`);
   }
 };
+
+    const arrayBuffer = await file.arrayBuffer();
+    // 创建新的 ArrayBuffer 并复制数据，确保类型兼容
+    const newBuffer = new ArrayBuffer(arrayBuffer.byteLength);
+    const source = new Uint8Array(arrayBuffer);
+    const target = new Uint8Array(newBuffer);
+    target.set(source);
+    return target;
+  } catch (err: any) {
+    throw new Error(`Failed to read OPFS database file: ${err.message}. Please ensure OPFS is properly configured.`);
+  }
+};
+
+export const importDatabase = async (data: Uint8Array) => {
+  if (!promiser) {
+    await initSQLite();
+  }
+  
+  if (dbId !== null) {
+    // 关闭现有数据库
+    await promiser('close', { dbId });
+    dbId = null;
+  }
+  
+  // 应用必须使用 OPFS
+  if (!isOpfsSupported()) {
+    throw new Error("OPFS is required for database import. Please ensure OPFS is supported and COOP/COEP headers are set.");
+  }
+
+  try {
+    // 将数据写入 OPFS
+    const root = await navigator.storage.getDirectory();
+    const fileHandle = await root.getFileHandle('gitdb_data.db', { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(data as any);
+    await writable.close();
+    
+    // 重新打开数据库
+    const openResponse = await promiser('open', {
+      filename: 'file:gitdb_data.db?vfs=opfs',
+    });
+    
+    if (openResponse.result.code !== 0) {
+      throw new Error(`Failed to open imported database: ${openResponse.result.message || 'Unknown error'}`);
+    }
+    
+    dbId = openResponse.result.dbId;
+    // console.log("Database imported to OPFS");
+    
+    return { dbId, promiser };
+  } catch (err: any) {
+    throw new Error(`Failed to import database to OPFS: ${err.message}`);
+  }
+};
