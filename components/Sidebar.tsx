@@ -30,7 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-center space-x-2 text-primary font-bold">
           <img 
-            src="/images/logo.svg" 
+            src={`${import.meta.env.BASE_URL}images/logo.svg`}
             alt="GitDB Logo" 
             className="w-6 h-6"
           />
