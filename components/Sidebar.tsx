@@ -113,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer Action */}
-      <div className="p-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur border-t border-gray-200 dark:border-gray-700 relative">
+      <div className="px-4 py-3 h-[52px] bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur border-t border-gray-200 dark:border-gray-700 relative shrink-0 flex items-center">
         {hasUnsavedChanges && (
           <div className="absolute top-0 right-6 -translate-y-1/2 flex items-center space-x-1.5 px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase rounded shadow-lg animate-bounce">
             {ICONS.Warning}
@@ -123,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button 
           onClick={onSync}
           disabled={syncing}
-          className="w-full bg-primary hover:bg-primary/90 text-white text-[13px] font-black py-3 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all active:scale-[0.97]"
+          className="w-full bg-primary hover:bg-primary/90 text-white text-[13px] font-black py-2.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all active:scale-[0.97]"
         >
           {ICONS.Save}
           <span className="tracking-wide uppercase">{t.nav.sync}</span>

@@ -402,7 +402,7 @@ const App: React.FC = () => {
           )}
         </div>
         
-        <footer className="px-8 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[9px] text-gray-400 uppercase tracking-[0.2em] font-black shrink-0 transition-colors">
+        <footer className="px-8 py-3 h-[52px] bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[9px] text-gray-400 uppercase tracking-[0.2em] font-black shrink-0 transition-colors">
            <div className="flex items-center space-x-8">
               <span className="flex items-center space-x-2">
                 <span className={`w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-800 shadow-sm ${!state.config ? 'bg-gray-300' : (state.dbReady ? 'bg-green-500' : 'bg-red-500')}`}></span>
